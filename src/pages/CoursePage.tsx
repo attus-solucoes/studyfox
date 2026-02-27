@@ -5,7 +5,8 @@ import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'l
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
-import { generateGraphFromContent, readFileAsText } from '@/lib/gemini-graph';
+import { extractTextFromFile, extractTextFromString } from '@/lib/extractText';
+import { generateGraphFromText } from '@/lib/generateGraph';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -57,30 +58,40 @@ export default function CoursePage() {
     setShowSubjectModal(false);
   };
 
-  const handleUploadSubmit = async (file: File) => {
+  const handleUploadSubmit = async (file: File | null, textContent: string) => {
     if (!showUploadModal) return;
     const subjectId = showUploadModal;
+    const subject = course.subjects.find(s => s.id === subjectId);
     setShowUploadModal(null);
     updateSubject(course.id, subjectId, { status: 'processing' });
+    toast('🦊 Gerando grafo...');
 
     try {
-      const text = await readFileAsText(file);
-      if (!text.trim()) {
-        throw new Error('Arquivo vazio ou ilegível');
+      const text = file
+        ? await extractTextFromFile(file)
+        : extractTextFromString(textContent);
+
+      if (text.length < 100) {
+        updateSubject(course.id, subjectId, { status: 'error' });
+        toast.error('Conteúdo muito curto. Envie pelo menos 100 caracteres.');
+        return;
       }
-      const { nodes, edges } = await generateGraphFromContent(text);
-      updateSubject(course.id, subjectId, { status: 'ready', nodes, edges, progress: 0 });
-      toast.success('Grafo gerado com sucesso!');
+
+      const { concepts, edges, subjectName: detectedName } = await generateGraphFromText(text);
+      updateSubject(course.id, subjectId, {
+        status: 'ready',
+        nodes: concepts,
+        edges,
+        name: detectedName || subject?.name || '',
+        progress: 0,
+      });
+      toast.success('✓ Grafo criado com sucesso!');
     } catch (err) {
       console.error('Graph generation error:', err);
       updateSubject(course.id, subjectId, { status: 'error' });
-      toast.error('Erro ao gerar grafo. Tente novamente.');
+      toast.error('✗ Erro ao processar. Tente novamente.');
     }
   };
-
-  const avgProgress = course.subjects.length
-    ? Math.round(course.subjects.reduce((a, s) => a + s.progress, 0) / course.subjects.length)
-    : 0;
 
   return (
     <>
@@ -160,7 +171,10 @@ export default function CoursePage() {
                         </button>
                       )}
                       {s.status === 'processing' && (
-                        <p className="font-body text-[13px] text-muted">IA gerando grafo...</p>
+                        <p className="font-body text-[13px] text-muted">
+                          <Loader2 size={12} className="inline mr-1 animate-spin" />
+                          IA gerando grafo...
+                        </p>
                       )}
                       {s.status === 'error' && (
                         <button
@@ -175,7 +189,6 @@ export default function CoursePage() {
                 );
               })}
 
-              {/* Add subject card */}
               <div
                 onClick={() => setShowSubjectModal(true)}
                 className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex items-center justify-center hover:border-ink hover:text-ink transition-fast cursor-pointer text-muted"
@@ -258,56 +271,91 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
   );
 }
 
-function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (file: File) => void }) {
+function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (file: File | null, text: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [textContent, setTextContent] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [mode, setMode] = useState<'file' | 'text'>('file');
 
-  const handleFile = (f: File) => {
-    setFile(f);
-  };
+  const canSubmit = mode === 'file' ? !!file : textContent.trim().length > 0;
 
   return (
     <Modal onClose={onClose} title="Adicionar conteúdo">
-      <label className="font-body text-[11px] text-muted uppercase tracking-wide mb-2 block">APOSTILA OU MATERIAL</label>
-
-      <div
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={e => {
-          e.preventDefault();
-          setDragOver(false);
-          if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-        }}
-        onClick={() => fileRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-150 ${
-          dragOver ? 'border-ink bg-paper' : 'border-line hover:border-ink'
-        }`}
-      >
-        <Upload size={24} className="mx-auto text-muted mb-2" />
-        {file ? (
-          <p className="font-body text-sm text-ink">{file.name}</p>
-        ) : (
-          <>
-            <p className="font-body text-sm text-ink">Arraste um arquivo aqui</p>
-            <p className="font-body text-xs text-muted mt-1">PDF, TXT, DOC, DOCX</p>
-          </>
-        )}
+      {/* Mode tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setMode('file')}
+          className={`font-body text-[12px] px-3 py-1.5 rounded-md border transition-all duration-150 ${
+            mode === 'file' ? 'border-ink bg-ink text-lime' : 'border-line text-muted hover:border-ink'
+          }`}
+        >
+          <Upload size={12} className="inline mr-1" /> Arquivo
+        </button>
+        <button
+          onClick={() => setMode('text')}
+          className={`font-body text-[12px] px-3 py-1.5 rounded-md border transition-all duration-150 ${
+            mode === 'text' ? 'border-ink bg-ink text-lime' : 'border-line text-muted hover:border-ink'
+          }`}
+        >
+          <FileText size={12} className="inline mr-1" /> Colar texto
+        </button>
       </div>
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".pdf,.txt,.doc,.docx"
-        className="hidden"
-        onChange={e => {
-          if (e.target.files?.[0]) handleFile(e.target.files[0]);
-        }}
-      />
+      {mode === 'file' ? (
+        <>
+          <label className="font-body text-[11px] text-muted uppercase tracking-wide mb-2 block">APOSTILA OU MATERIAL</label>
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOver(false);
+              if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+            }}
+            onClick={() => fileRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-150 ${
+              dragOver ? 'border-ink bg-paper' : 'border-line hover:border-ink'
+            }`}
+          >
+            <Upload size={24} className="mx-auto text-muted mb-2" />
+            {file ? (
+              <p className="font-body text-sm text-ink">{file.name}</p>
+            ) : (
+              <>
+                <p className="font-body text-sm text-ink">Arraste um arquivo aqui</p>
+                <p className="font-body text-xs text-muted mt-1">PDF, TXT, DOC, DOCX</p>
+              </>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.txt,.doc,.docx"
+            className="hidden"
+            onChange={e => {
+              if (e.target.files?.[0]) setFile(e.target.files[0]);
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <label className="font-body text-[11px] text-muted uppercase tracking-wide mb-2 block">COLE O CONTEÚDO</label>
+          <textarea
+            value={textContent}
+            onChange={e => setTextContent(e.target.value)}
+            placeholder="Cole aqui o conteúdo da apostila, anotações ou resumo..."
+            className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none resize-none h-40"
+          />
+          <p className="font-body text-[11px] text-muted mt-1">
+            {textContent.length} caracteres · mín. 100
+          </p>
+        </>
+      )}
 
       <button
-        onClick={() => file && onSubmit(file)}
-        disabled={!file}
+        onClick={() => onSubmit(mode === 'file' ? file : null, textContent)}
+        disabled={!canSubmit}
         className="bg-ink text-lime font-display font-bold text-[13px] tracking-wide w-full py-3 rounded-md hover:bg-graphite transition-all duration-[120ms] mt-4 disabled:opacity-40"
       >
         Gerar grafo com IA →
