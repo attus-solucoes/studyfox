@@ -31,6 +31,14 @@ Retorne APENAS JSON válido:
 }`;
 
 export async function generateGraphFromText(text: string) {
+  console.log('STEP 1: texto recebido, length =', text.length);
+
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY não definida em src/lib/gemini.ts');
+  }
+
+  console.log('STEP 2: chamando Gemini API...');
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
     {
@@ -56,12 +64,37 @@ export async function generateGraphFromText(text: string) {
   const data = await response.json();
   const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  console.log('STEP 3: resposta IA recebida, length =', rawText.length);
+
+  // Strip markdown code fences
+  const stripped = rawText
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
+    console.error('RAW IA RESPONSE:', rawText);
     throw new Error('IA não retornou JSON válido');
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (parseErr) {
+    console.error('JSON parse falhou, tentando reparar...', parseErr);
+    try {
+      const repaired = jsonMatch[0]
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']')
+        .replace(/[\x00-\x1F\x7F]/g, '');
+      parsed = JSON.parse(repaired);
+    } catch (repairErr) {
+      console.error('ERRO DETALHADO IA:', repairErr);
+      console.error('RAW JSON:', jsonMatch[0]);
+      throw new Error('Falha ao interpretar resposta da IA');
+    }
+  }
 
   if (!Array.isArray(parsed.concepts) || !Array.isArray(parsed.dependencies)) {
     throw new Error('Formato inválido: concepts e dependencies são obrigatórios');
