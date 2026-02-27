@@ -177,12 +177,15 @@ export default function CoursePage() {
                         </p>
                       )}
                       {s.status === 'error' && (
-                        <button
-                          onClick={() => setShowUploadModal(s.id)}
-                          className="font-body text-[13px] text-ember hover:text-ink transition-fast"
-                        >
-                          Tentar novamente →
-                        </button>
+                        <div>
+                          <button
+                            onClick={() => setShowUploadModal(s.id)}
+                            className="font-body text-[13px] text-ember hover:text-ink transition-fast"
+                          >
+                            Tentar novamente →
+                          </button>
+                          <p className="font-body text-[11px] text-muted mt-1">Erro técnico — veja console (F12)</p>
+                        </div>
                       )}
                     </div>
                   </div>
