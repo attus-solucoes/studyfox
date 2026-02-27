@@ -3,7 +3,9 @@ import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
 import { useState, useRef } from 'react';
+import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
+import { generateGraphFromContent, readFileAsText } from '@/lib/gemini-graph';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -55,10 +57,25 @@ export default function CoursePage() {
     setShowSubjectModal(false);
   };
 
-  const handleUploadSubmit = () => {
+  const handleUploadSubmit = async (file: File) => {
     if (!showUploadModal) return;
-    updateSubject(course.id, showUploadModal, { status: 'processing' });
+    const subjectId = showUploadModal;
     setShowUploadModal(null);
+    updateSubject(course.id, subjectId, { status: 'processing' });
+
+    try {
+      const text = await readFileAsText(file);
+      if (!text.trim()) {
+        throw new Error('Arquivo vazio ou ilegível');
+      }
+      const { nodes, edges } = await generateGraphFromContent(text);
+      updateSubject(course.id, subjectId, { status: 'ready', nodes, edges, progress: 0 });
+      toast.success('Grafo gerado com sucesso!');
+    } catch (err) {
+      console.error('Graph generation error:', err);
+      updateSubject(course.id, subjectId, { status: 'error' });
+      toast.error('Erro ao gerar grafo. Tente novamente.');
+    }
   };
 
   const avgProgress = course.subjects.length
@@ -241,13 +258,13 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
   );
 }
 
-function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: () => void }) {
+function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (file: File) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const handleFile = (file: File) => {
-    setFileName(file.name);
+  const handleFile = (f: File) => {
+    setFile(f);
   };
 
   return (
@@ -268,8 +285,8 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: () 
         }`}
       >
         <Upload size={24} className="mx-auto text-muted mb-2" />
-        {fileName ? (
-          <p className="font-body text-sm text-ink">{fileName}</p>
+        {file ? (
+          <p className="font-body text-sm text-ink">{file.name}</p>
         ) : (
           <>
             <p className="font-body text-sm text-ink">Arraste um arquivo aqui</p>
@@ -289,8 +306,9 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: () 
       />
 
       <button
-        onClick={onSubmit}
-        className="bg-ink text-lime font-display font-bold text-[13px] tracking-wide w-full py-3 rounded-md hover:bg-graphite transition-all duration-[120ms] mt-4"
+        onClick={() => file && onSubmit(file)}
+        disabled={!file}
+        className="bg-ink text-lime font-display font-bold text-[13px] tracking-wide w-full py-3 rounded-md hover:bg-graphite transition-all duration-[120ms] mt-4 disabled:opacity-40"
       >
         Gerar grafo com IA →
       </button>
