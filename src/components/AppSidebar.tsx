@@ -1,12 +1,8 @@
 import { BookOpen, House, BarChart2, Settings, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useApp } from '@/contexts/AppContext';
 import { useState } from 'react';
-
-const subjects = [
-  { id: 'rac', name: 'Refrigeração (RAC)' },
-  { id: 'thermo', name: 'Termodinâmica' },
-];
 
 const navItems = [
   { to: '/home', icon: House, label: 'Home' },
@@ -17,9 +13,15 @@ const navItems = [
 export default function AppSidebar() {
   const location = useLocation();
   const { user } = useAuth();
+  const { courses } = useApp();
   const [open, setOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
+
+  // Flatten all subjects from all courses for sidebar
+  const allSubjects = courses.flatMap(c =>
+    c.subjects.filter(s => s.status === 'ready').map(s => ({ id: s.id, name: s.name }))
+  );
 
   const sidebar = (
     <aside className={`
@@ -43,25 +45,29 @@ export default function AppSidebar() {
         <div className="px-4 pt-4 pb-1">
           <span className="font-body text-[10px] text-muted uppercase tracking-widest">Matérias</span>
         </div>
-        {subjects.map(s => {
-          const path = `/subject/${s.id}`;
-          const active = isActive(path);
-          return (
-            <Link
-              key={s.id}
-              to={path}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-2.5 px-4 py-2 font-body text-[13px] transition-fast ${
-                active
-                  ? 'text-lime border-l-2 border-lime bg-[#1A1A18]'
-                  : 'text-[#E8E4DC] border-l-2 border-transparent hover:bg-[#1A1A18]'
-              }`}
-            >
-              <BookOpen size={14} />
-              {s.name}
-            </Link>
-          );
-        })}
+        {allSubjects.length === 0 ? (
+          <p className="px-4 py-2 font-body text-[12px] text-muted">Nenhuma pronta</p>
+        ) : (
+          allSubjects.map(s => {
+            const path = `/subject/${s.id}`;
+            const active = isActive(path);
+            return (
+              <Link
+                key={s.id}
+                to={path}
+                onClick={() => setOpen(false)}
+                className={`flex items-center gap-2.5 px-4 py-2 font-body text-[13px] transition-fast ${
+                  active
+                    ? 'text-lime border-l-2 border-lime bg-[#1A1A18]'
+                    : 'text-[#E8E4DC] border-l-2 border-transparent hover:bg-[#1A1A18]'
+                }`}
+              >
+                <BookOpen size={14} />
+                {s.name}
+              </Link>
+            );
+          })
+        )}
 
         {/* Navegar */}
         <div className="px-4 pt-5 pb-1">
@@ -111,19 +117,15 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         onClick={() => setOpen(!open)}
         className="fixed top-3 left-3 z-50 lg:hidden p-1.5 bg-ink rounded-md text-lime"
       >
         {open ? <X size={18} /> : <Menu size={18} />}
       </button>
-
-      {/* Overlay */}
       {open && (
         <div className="fixed inset-0 bg-ink/50 z-30 lg:hidden" onClick={() => setOpen(false)} />
       )}
-
       {sidebar}
     </>
   );
