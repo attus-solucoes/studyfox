@@ -20,6 +20,7 @@ export default function Concept() {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [attempts, setAttempts] = useState(1);
 
   const check = () => {
     const val = parseFloat(answer);
@@ -33,6 +34,7 @@ export default function Concept() {
   const retry = () => {
     setResult(null);
     setAnswer('');
+    setAttempts(a => a + 1);
   };
 
   return (
@@ -102,13 +104,12 @@ export default function Concept() {
                   className="bg-lime rounded-lg p-5"
                 >
                   <p className="font-display font-extrabold text-2xl text-ink">✓ Correto.</p>
-                  <p className="font-mono text-xs text-ink mt-1">
-                    COP = (390−255)/(432−390) = 135/42 = 3,21
-                  </p>
-                  <div className="mt-3">
-                    <span className="font-body text-[10px] text-ink/60 uppercase tracking-wide">Domínio</span>
-                    <p className="font-body text-sm text-ink">72% → 79%</p>
-                    <div className="w-full h-1 bg-ink/20 mt-1">
+                   <p className="font-mono text-xs text-ink mt-1 mb-4">
+                     COP = (390−255)/(432−390) = 135/42 ≈ 3,21
+                   </p>
+                   <div>
+                     <p className="font-body text-[11px] text-muted mb-1">72% → 79%</p>
+                     <div className="w-full h-1 bg-ink/20">
                       <motion.div
                         className="h-full bg-ink"
                         initial={{ width: '72%' }}
@@ -117,9 +118,9 @@ export default function Concept() {
                       />
                     </div>
                   </div>
-                  <button className="w-full bg-ink text-lime font-body font-semibold text-[13px] py-2.5 rounded-md mt-4 hover:bg-graphite transition-fast">
-                    próximo →
-                  </button>
+                   <button className="w-full bg-ink text-lime font-body font-semibold text-[13px] py-2.5 rounded-md mt-3 hover:bg-graphite transition-fast">
+                     próximo exercício →
+                   </button>
                 </motion.div>
               ) : result === 'wrong' ? (
                 <motion.div
@@ -128,8 +129,8 @@ export default function Concept() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="bg-ember rounded-lg p-5"
                 >
-                  <p className="font-display font-bold text-xl text-white">✗ Não desta vez.</p>
-                  <p className="font-body text-[13px] text-white/80 mt-1">
+                   <p className="font-display font-bold text-xl text-white mb-2">✗ Não desta vez.</p>
+                   <p className="font-body text-[13px] text-white/80 mb-3">
                     Verifique qual entalpia representa cada ponto do ciclo.
                   </p>
                   <button
@@ -158,13 +159,13 @@ export default function Concept() {
                     Um sistema de refrigeração opera com R-134a. Dados do ciclo:
                   </p>
 
-                  <div className="bg-paper border border-line rounded p-3 mt-2">
-                    <p className="font-mono text-xs text-graphite">h1 = 390 kJ/kg</p>
-                    <p className="font-mono text-xs text-graphite">h2 = 432 kJ/kg</p>
-                    <p className="font-mono text-xs text-graphite">h4 = 255 kJ/kg</p>
-                  </div>
+                   <div className="bg-paper border border-line rounded p-3 mt-2 mb-3">
+                     <p className="font-mono text-xs text-graphite">h1 = 390 kJ/kg   (saída evaporador)</p>
+                     <p className="font-mono text-xs text-graphite">h2 = 432 kJ/kg   (saída compressor)</p>
+                     <p className="font-mono text-xs text-graphite">h4 = 255 kJ/kg   (saída válvula)</p>
+                   </div>
 
-                  <p className="font-body font-semibold text-sm text-ink mt-3">Calcule o COP.</p>
+                   <p className="font-body font-semibold text-sm text-ink mb-3">Calcule o COP do ciclo.</p>
 
                   {/* Hint */}
                   <div className="mt-2">
@@ -184,8 +185,8 @@ export default function Concept() {
                           className="overflow-hidden"
                         >
                           <div className="bg-paper border border-line p-3 rounded mt-1">
-                            <p className="font-body text-[13px] text-graphite">
-                              Use COP = (h1−h4)/(h2−h1).
+                           <p className="font-body text-[13px] text-graphite">
+                              Use COP = (h1−h4)/(h2−h1). Identifique cada entalpia no enunciado.
                             </p>
                           </div>
                         </motion.div>
@@ -194,8 +195,8 @@ export default function Concept() {
                   </div>
 
                   {/* Input */}
-                  <div className="mt-4">
-                    <label className="font-body text-[10px] text-muted uppercase tracking-wide">Resposta</label>
+                   <div className="mt-3">
+                     <label className="font-body text-[10px] text-muted uppercase tracking-widest mb-1 block">Resposta</label>
                     <input
                       type="number"
                       step="0.01"
@@ -204,15 +205,16 @@ export default function Concept() {
                       className="w-full bg-white border-[1.5px] border-line rounded-md p-3 font-body text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none transition-fast mt-1"
                       placeholder="0.00"
                     />
-                    <button
-                      onClick={check}
-                      disabled={!answer}
-                      className="w-full bg-ink text-lime font-display font-bold text-[13px] tracking-wide py-3 rounded-md mt-3 hover:bg-graphite transition-fast disabled:opacity-40"
-                    >
-                      VERIFICAR →
-                    </button>
-                  </div>
-                </motion.div>
+                     <button
+                       onClick={check}
+                       disabled={!answer}
+                       className="w-full bg-ink text-lime font-display font-bold text-[13px] tracking-wide py-3 rounded-md mt-3 hover:bg-graphite transition-fast disabled:opacity-40"
+                     >
+                       VERIFICAR →
+                     </button>
+                   </div>
+                   <p className="font-body text-[11px] text-muted mt-2 text-center">tentativa {attempts}</p>
+                 </motion.div>
               )}
             </AnimatePresence>
           </div>

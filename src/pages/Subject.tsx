@@ -201,36 +201,38 @@ export default function Subject() {
               <p className="font-body font-semibold text-base text-ink">{selected.label}</p>
               <p className="font-body text-[11px] text-muted mt-0.5">Nível 2</p>
 
-              <div className="mt-4">
-                <span className="font-body text-[10px] text-muted uppercase tracking-wide">Domínio</span>
-                <div className="w-full h-1.5 bg-line mt-1.5 rounded-none">
-                  <div
-                    className="h-full"
-                    style={{
-                      width: `${selected.mastery * 100}%`,
-                      backgroundColor:
-                        selected.mastery < 0.4 ? '#E2DDD6' : selected.mastery < 0.7 ? '#111110' : '#BFFF00',
-                    }}
-                  />
-                </div>
-                <p className="font-display font-bold text-[28px] text-ink mt-1">
-                  {Math.round(selected.mastery * 100)}%
-                </p>
+              <div className="h-px bg-line my-4" />
+
+              <span className="font-body text-[10px] text-muted uppercase tracking-widest">Domínio</span>
+              <p className="font-display font-bold text-[32px] text-ink mt-1">
+                {Math.round(selected.mastery * 100)}%
+              </p>
+              <div className="w-full h-1 bg-line mt-1.5">
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${selected.mastery * 100}%`,
+                    backgroundColor:
+                      selected.mastery < 0.4 ? '#D4CFC6' : selected.mastery < 0.7 ? '#111110' : '#BFFF00',
+                  }}
+                />
               </div>
 
-              <div className="mt-4">
-                <span className="font-body text-[10px] text-muted uppercase tracking-wide">Pré-requisitos</span>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {getPrereqs(selected.id).map(p => (
-                    <span key={p} className="font-body text-xs border border-line px-2 py-0.5 rounded">
-                      {p}
-                    </span>
-                  ))}
-                  {getPrereqs(selected.id).length === 0 && (
-                    <span className="font-body text-xs text-muted">Nenhum</span>
-                  )}
-                </div>
+              <div className="h-px bg-line my-4" />
+
+              <span className="font-body text-[10px] text-muted uppercase tracking-widest">Pré-requisitos</span>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {getPrereqs(selected.id).map(p => (
+                  <span key={p} className="font-body text-[11px] text-graphite border border-line px-2 py-1 rounded">
+                    {p}
+                  </span>
+                ))}
+                {getPrereqs(selected.id).length === 0 && (
+                  <span className="font-body text-[11px] text-muted">Nenhum</span>
+                )}
               </div>
+
+              <div className="flex-grow" />
 
               <button
                 onClick={() => navigate(`/concept/${selected.id}`)}
