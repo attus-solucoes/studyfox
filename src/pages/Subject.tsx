@@ -1,36 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useApp } from '@/contexts/AppContext';
+import type { GraphNode, GraphEdge } from '@/types/course';
 
-const nodes = [
-  { id: '1', label: '1ª Lei Termo.', x: 150, y: 100, mastery: 0 },
-  { id: '2', label: 'Fluidos', x: 380, y: 100, mastery: 0 },
-  { id: '3', label: 'Mudança de Fase', x: 610, y: 100, mastery: 0 },
-  { id: '4', label: 'Transf. Calor', x: 840, y: 100, mastery: 0 },
-  { id: '5', label: 'Diagrama P-h', x: 250, y: 260, mastery: 0 },
-  { id: '6', label: 'Ciclo Ideal', x: 500, y: 260, mastery: 0 },
-  { id: '7', label: 'COP', x: 750, y: 260, mastery: 0.72 },
-  { id: '8', label: 'Compressores', x: 160, y: 420, mastery: 0 },
-  { id: '9', label: 'Condensadores', x: 380, y: 420, mastery: 0.35 },
-  { id: '10', label: 'Evaporadores', x: 600, y: 420, mastery: 0 },
-  { id: '11', label: 'Expansão', x: 820, y: 420, mastery: 0 },
-  { id: '12', label: 'Ciclo Real', x: 310, y: 580, mastery: 0 },
-  { id: '13', label: 'Carga Térmica', x: 580, y: 580, mastery: 0 },
-  { id: '14', label: 'Subresfriamento', x: 800, y: 580, mastery: 0.88 },
-  { id: '15', label: 'Dimensionamento', x: 450, y: 740, mastery: 0 },
-];
-
-const edges = [
-  { s: '1', t: '5' }, { s: '2', t: '5' }, { s: '3', t: '5' },
-  { s: '1', t: '6' }, { s: '5', t: '6' }, { s: '4', t: '6' },
-  { s: '6', t: '7' }, { s: '6', t: '8' }, { s: '6', t: '9' },
-  { s: '6', t: '10' }, { s: '6', t: '11' },
-  { s: '8', t: '12' }, { s: '9', t: '12' },
-  { s: '4', t: '13' }, { s: '6', t: '13' },
-  { s: '12', t: '14' }, { s: '9', t: '14' },
-  { s: '12', t: '15' }, { s: '13', t: '15' }, { s: '14', t: '15' },
-];
+const NODE_W = 96;
+const NODE_H = 34;
 
 function getNodeStyle(mastery: number) {
   if (mastery >= 0.9) return { fill: '#BFFF00', stroke: '#BFFF00', textColor: '#111110' };
@@ -39,147 +15,231 @@ function getNodeStyle(mastery: number) {
   return { fill: '#FAFAF8', stroke: '#D4CFC6', textColor: '#7A7A78' };
 }
 
-function getPrereqs(nodeId: string) {
-  return edges.filter(e => e.t === nodeId).map(e => {
-    const n = nodes.find(n => n.id === e.s);
-    return n?.label || '';
-  });
-}
-
 export default function Subject() {
-  const [selected, setSelected] = useState<typeof nodes[0] | null>(null);
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { courses } = useApp();
+
+  const result = (() => {
+    for (const c of courses) {
+      const s = c.subjects.find(s => s.id === id);
+      if (s) return { course: c, subject: s };
+    }
+    return null;
+  })();
+
+  const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 1000, h: 860 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
+  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+
+  // Center graph on mount
+  useEffect(() => {
+    if (!result?.subject.nodes.length || !containerRef.current) return;
+    const nodes = result.subject.nodes;
+    const minX = Math.min(...nodes.map(n => n.x));
+    const maxX = Math.max(...nodes.map(n => n.x));
+    const minY = Math.min(...nodes.map(n => n.y));
+    const maxY = Math.max(...nodes.map(n => n.y));
+    const graphW = maxX - minX + NODE_W * 2;
+    const graphH = maxY - minY + NODE_H * 2;
+    const rect = containerRef.current.getBoundingClientRect();
+    const scaleX = rect.width / graphW;
+    const scaleY = rect.height / graphH;
+    const scale = Math.min(scaleX, scaleY, 1.2) * 0.85;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setTransform({
+      x: rect.width / 2 - cx * scale,
+      y: rect.height / 2 - cy * scale,
+      scale,
+    });
+  }, [result?.subject.nodes]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 1.1 : 0.9;
-    setViewBox(v => {
-      const nw = v.w * factor;
-      const nh = v.h * factor;
-      return { x: v.x - (nw - v.w) / 2, y: v.y - (nh - v.h) / 2, w: nw, h: nh };
+    const factor = e.deltaY > 0 ? 0.92 : 1.08;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    setTransform(t => {
+      const newScale = Math.min(Math.max(t.scale * factor, 0.2), 3);
+      return {
+        x: mx - (mx - t.x) * (newScale / t.scale),
+        y: my - (my - t.y) * (newScale / t.scale),
+        scale: newScale,
+      };
     });
   }, []);
 
   useEffect(() => {
-    const svg = svgRef.current;
-    if (svg) svg.addEventListener('wheel', handleWheel, { passive: false });
-    return () => { if (svg) svg.removeEventListener('wheel', handleWheel); };
+    const el = containerRef.current;
+    if (el) el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => { if (el) el.removeEventListener('wheel', handleWheel); };
   }, [handleWheel]);
 
-  const onMouseDown = (e: React.MouseEvent) => {
+  const onPointerDown = (e: React.PointerEvent) => {
     setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, vx: viewBox.x, vy: viewBox.y };
+    dragStart.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = viewBox.w / rect.width;
-    const scaleY = viewBox.h / rect.height;
-    setViewBox(v => ({
-      ...v,
-      x: dragStart.current.vx - (e.clientX - dragStart.current.x) * scaleX,
-      y: dragStart.current.vy - (e.clientY - dragStart.current.y) * scaleY,
+    setTransform(t => ({
+      ...t,
+      x: dragStart.current.tx + (e.clientX - dragStart.current.x),
+      y: dragStart.current.ty + (e.clientY - dragStart.current.y),
     }));
   };
-  const onMouseUp = () => setDragging(false);
+  const onPointerUp = () => setDragging(false);
 
-  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  if (!result || result.subject.status !== 'ready') {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-3xl mb-3">🦊</p>
+        <p className="font-body font-semibold text-base text-ink">Matéria não encontrada ou sem grafo.</p>
+        <Link to="/home" className="font-body text-sm text-muted hover:text-ink mt-2 inline-block">← Voltar</Link>
+      </div>
+    );
+  }
+
+  const { course, subject } = result;
+  const nodes = subject.nodes;
+  const edges = subject.edges;
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+  const getPrereqs = (nodeId: string) =>
+    edges.filter(e => e.to === nodeId).map(e => nodeMap.get(e.from)?.title).filter(Boolean) as string[];
+
+  const masteredCount = nodes.filter(n => n.mastery >= 0.7).length;
+  const progressPct = nodes.length ? Math.round((masteredCount / nodes.length) * 100) : 0;
+
+  // Tooltip position
+  const hoveredNodeData = hoveredNode ? nodeMap.get(hoveredNode) : null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)]">
       {/* Graph header */}
       <div className="h-10 bg-paper border-b border-line px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <span className="font-body font-semibold text-[13px] text-ink">Refrigeração (RAC)</span>
+          <Link to={`/course/${course.id}`} className="font-body text-xs text-muted hover:text-ink transition-fast">
+            {course.name}
+          </Link>
+          <span className="text-muted text-xs">/</span>
+          <span className="font-body font-semibold text-[13px] text-ink">{subject.name}</span>
           <div className="w-[60px] h-0.5 bg-line">
-            <div className="h-full bg-lime" style={{ width: '18%' }} />
+            <div className="h-full bg-lime" style={{ width: `${progressPct}%` }} />
           </div>
-          <span className="font-body text-[11px] text-muted">18% dominado</span>
+          <span className="font-body text-[11px] text-muted">{progressPct}% dominado</span>
         </div>
-        <button className="font-body text-xs text-muted hover:underline transition-fast">
-          Retomar →
-        </button>
+        <span className="font-body text-[11px] text-muted">{nodes.length} conceitos</span>
       </div>
 
-      <div className="flex-1 relative overflow-hidden">
+      <div ref={containerRef} className="flex-1 relative overflow-hidden" style={{ touchAction: 'none' }}>
         <svg
           ref={svgRef}
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-          className="w-full h-full cursor-grab active:cursor-grabbing"
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
+          width="100%"
+          height="100%"
+          className={`${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          style={{ touchAction: 'none' }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
         >
-          {/* Edges */}
-          {edges.map((e, i) => {
-            const src = nodeMap[e.s];
-            const tgt = nodeMap[e.t];
-            if (!src || !tgt) return null;
-            const cx = (src.x + tgt.x) / 2;
-            const cy = (src.y + tgt.y) / 2 - 20;
-            return (
-              <motion.path
-                key={`e-${i}`}
-                d={`M ${src.x},${src.y} Q ${cx},${cy} ${tgt.x},${tgt.y}`}
-                fill="none"
-                stroke="#D4CFC6"
-                strokeWidth={1.5}
-                className="hover:stroke-ink transition-fast"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.3, delay: 0.3 + i * 0.04 }}
-              />
-            );
-          })}
-
-          {/* Nodes */}
-          {nodes.map((node, i) => {
-            const style = getNodeStyle(node.mastery);
-            return (
-              <motion.g
-                key={node.id}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: i * 0.06 }}
-                className="cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(node);
-                }}
-              >
-                <rect
-                  x={node.x - 45}
-                  y={node.y - 16}
-                  width={90}
-                  height={32}
-                  rx={4}
-                  fill={style.fill}
-                  stroke={style.stroke}
-                  strokeWidth={node.mastery > 0 && node.mastery < 0.7 ? 1.5 : 1}
-                  className="hover:scale-105 transition-fast"
+          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            {/* Edges */}
+            {edges.map((e, i) => {
+              const src = nodeMap.get(e.from);
+              const tgt = nodeMap.get(e.to);
+              if (!src || !tgt) return null;
+              const cx = (src.x + tgt.x) / 2;
+              const cy = (src.y + tgt.y) / 2 - 30;
+              return (
+                <motion.path
+                  key={`e-${i}`}
+                  d={`M ${src.x},${src.y} Q ${cx},${cy} ${tgt.x},${tgt.y}`}
+                  fill="none"
+                  stroke="#D4CFC6"
+                  strokeWidth={1.5}
+                  style={{ pointerEvents: 'none' }}
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.3, delay: 0.3 + i * 0.04 }}
                 />
-                <text
-                  x={node.x}
-                  y={node.y + 4}
-                  textAnchor="middle"
-                  fill={style.textColor}
-                  className="font-body text-[9px] pointer-events-none select-none"
-                  fontSize={9}
-                  fontFamily="DM Sans, sans-serif"
+              );
+            })}
+
+            {/* Nodes */}
+            {nodes.map((node, i) => {
+              const style = getNodeStyle(node.mastery);
+              return (
+                <motion.g
+                  key={node.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: i * 0.06 }}
+                  className="cursor-pointer"
+                  onPointerEnter={() => setHoveredNode(node.id)}
+                  onPointerLeave={() => setHoveredNode(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelected(node);
+                  }}
                 >
-                  {node.label}
-                </text>
-              </motion.g>
-            );
-          })}
+                  <rect
+                    x={node.x - NODE_W / 2}
+                    y={node.y - NODE_H / 2}
+                    width={NODE_W}
+                    height={NODE_H}
+                    rx={4}
+                    fill={style.fill}
+                    stroke={style.stroke}
+                    strokeWidth={node.mastery > 0 && node.mastery < 0.7 ? 1.5 : 1}
+                  />
+                  <text
+                    x={node.x}
+                    y={node.y + 4}
+                    textAnchor="middle"
+                    fill={style.textColor}
+                    fontSize={9}
+                    fontFamily="DM Sans, sans-serif"
+                    className="pointer-events-none select-none"
+                  >
+                    {node.title.length > 14 ? node.title.slice(0, 13) + '…' : node.title}
+                  </text>
+                </motion.g>
+              );
+            })}
+          </g>
         </svg>
+
+        {/* Tooltip (outside transformed group) */}
+        <AnimatePresence>
+          {hoveredNodeData && !selected && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.1 }}
+              className="absolute pointer-events-none bg-ink text-white font-body text-[11px] px-3 py-1.5 rounded shadow-lg max-w-[200px]"
+              style={{
+                left: hoveredNodeData.x * transform.scale + transform.x,
+                top: hoveredNodeData.y * transform.scale + transform.y - 50,
+                transform: 'translateX(-50%)',
+              }}
+            >
+              <p className="font-semibold">{hoveredNodeData.title}</p>
+              {hoveredNodeData.description && (
+                <p className="text-[10px] text-white/70 mt-0.5 line-clamp-2">{hoveredNodeData.description}</p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Side Panel */}
         <AnimatePresence>
@@ -198,8 +258,32 @@ export default function Subject() {
                 <X size={16} />
               </button>
 
-              <p className="font-body font-semibold text-base text-ink">{selected.label}</p>
-              <p className="font-body text-[11px] text-muted mt-0.5">Nível 2</p>
+              <p className="font-body font-semibold text-base text-ink">{selected.title}</p>
+              <p className="font-body text-[11px] text-muted mt-0.5">Nível {selected.level}</p>
+
+              {selected.description && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Descrição</span>
+                  <p className="font-body text-[13px] text-ink mt-1">{selected.description}</p>
+                </>
+              )}
+
+              {selected.intuition && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Intuição</span>
+                  <p className="font-body text-[13px] text-ink mt-1">{selected.intuition}</p>
+                </>
+              )}
+
+              {selected.formula && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Fórmula</span>
+                  <p className="font-body text-[13px] text-ink mt-1 font-mono bg-paper px-2 py-1 rounded">{selected.formula}</p>
+                </>
+              )}
 
               <div className="h-px bg-line my-4" />
 
@@ -231,8 +315,6 @@ export default function Subject() {
                   <span className="font-body text-[11px] text-muted">Nenhum</span>
                 )}
               </div>
-
-              <div className="flex-grow" />
 
               <button
                 onClick={() => navigate(`/concept/${selected.id}`)}
