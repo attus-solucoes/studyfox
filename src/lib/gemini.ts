@@ -41,10 +41,15 @@ export interface OpenAIRequest {
   response_format?: { type: string };
 }
 
-export async function callOpenAIProxy(request: OpenAIRequest): Promise<any> {
+export async function callOpenAIProxy(request: OpenAIRequest, signal?: AbortSignal): Promise<any> {
   const { data, error } = await supabase.functions.invoke('openai-proxy', {
     body: request,
-  });
+    ...(signal ? { signal } : {}),
+  } as any);
+
+  if (signal?.aborted) {
+    throw new DOMException('Geração cancelada pelo usuário.', 'AbortError');
+  }
 
   if (error) {
     console.error('[StudyOS] Edge function error:', error);

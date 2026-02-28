@@ -10,6 +10,7 @@ interface AppContextType {
   addCourse: (course: Course) => void;
   addSubject: (courseId: string, subject: Subject) => void;
   updateSubject: (courseId: string, subjectId: string, updates: Partial<Subject>) => void;
+  deleteSubject: (courseId: string, subjectId: string) => void;
   getSubject: (subjectId: string) => { course: Course; subject: Subject } | null;
 
   // ─── Novos métodos para nós/conceitos ─────────────
@@ -109,6 +110,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   : s
               ),
             }
+          : c
+      )
+    );
+  }, []);
+
+  const deleteSubject = useCallback((courseId: string, subjectId: string) => {
+    setCourses(prev =>
+      prev.map(c =>
+        c.id === courseId
+          ? { ...c, subjects: c.subjects.filter(s => s.id !== subjectId) }
           : c
       )
     );
@@ -257,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addCourse,
         addSubject,
         updateSubject,
+        deleteSubject,
         getSubject,
         getNode,
         updateNode,

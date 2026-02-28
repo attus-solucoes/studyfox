@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
+import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText, MoreVertical, Pencil, FileSearch, RefreshCw, Trash2 } from 'lucide-react';
 import GraphGenerationOverlay from '@/components/GraphGenerationOverlay';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
@@ -21,7 +21,7 @@ const statusConfig: Record<Subject['status'], { label: string; color: string; ic
 export default function CoursePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { courses, addSubject, updateSubject } = useApp();
+  const { courses, addSubject, updateSubject, deleteSubject } = useApp();
   const course = courses.find(c => c.id === id);
 
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -29,6 +29,18 @@ export default function CoursePage() {
   const [subjectName, setSubjectName] = useState('');
   const [subjectSemester, setSubjectSemester] = useState('');
   const [progress, setProgress] = useState<ProgressInfo | null>(null);
+
+  // Subject management state
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [editSubject, setEditSubject] = useState<Subject | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSemester, setEditSemester] = useState('');
+  const [viewRawText, setViewRawText] = useState<Subject | null>(null);
+  const [confirmRetrain, setConfirmRetrain] = useState<Subject | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Subject | null>(null);
+
+  // Abort controller for cancelling generation
+  const abortRef = useRef<AbortController | null>(null);
 
   if (!course) {
     return (
@@ -59,17 +71,19 @@ export default function CoursePage() {
     setShowSubjectModal(false);
   };
 
-  const handleUploadSubmit = async (file: File | null, textContent: string) => {
-    if (!showUploadModal) return;
-    const subjectId = showUploadModal;
+  const handleUploadSubmit = async (file: File | null, textContent: string, subjectIdOverride?: string) => {
+    const subjectId = subjectIdOverride || showUploadModal;
+    if (!subjectId) return;
     const subject = course.subjects.find(s => s.id === subjectId);
-    setShowUploadModal(null);
+    if (!subjectIdOverride) setShowUploadModal(null);
     updateSubject(course.id, subjectId, { status: 'processing' });
     setProgress({ step: 'Preparando análise...', current: 0, total: 1 });
     toast('🦊 IA analisando material...');
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      // Validar input mínimo
       if (!file && textContent.trim().length < 80) {
         updateSubject(course.id, subjectId, { status: 'error' });
         setProgress(null);
@@ -77,13 +91,10 @@ export default function CoursePage() {
         return;
       }
 
-      // Gerar grafo com callback de progresso
       const { concepts, edges, subjectName: detectedName } = await generateGraph(
-        {
-          file: file || undefined,
-          text: file ? undefined : textContent,
-        },
-        (info) => setProgress(info)
+        { file: file || undefined, text: file ? undefined : textContent },
+        (info) => setProgress(info),
+        controller.signal
       );
 
       updateSubject(course.id, subjectId, {
@@ -96,11 +107,46 @@ export default function CoursePage() {
       setProgress(null);
       toast.success(`✓ Grafo criado: ${concepts.length} conceitos mapeados!`);
     } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        updateSubject(course.id, subjectId, { status: 'empty' });
+        setProgress(null);
+        toast('Geração cancelada.');
+        return;
+      }
       console.error('[StudyOS] Graph generation error:', err);
       updateSubject(course.id, subjectId, { status: 'error' });
       setProgress(null);
       toast.error(err?.message || '✗ Erro ao processar. Tente novamente.');
+    } finally {
+      abortRef.current = null;
     }
+  };
+
+  const handleCancelGeneration = () => {
+    abortRef.current?.abort();
+  };
+
+  const handleEditSave = () => {
+    if (!editSubject || !editName.trim()) return;
+    updateSubject(course.id, editSubject.id, {
+      name: editName.trim(),
+      semester: editSemester.trim(),
+    });
+    setEditSubject(null);
+    toast.success('Matéria atualizada!');
+  };
+
+  const handleRetrain = (s: Subject) => {
+    setConfirmRetrain(null);
+    updateSubject(course.id, s.id, { nodes: [], edges: [], status: 'empty', progress: 0 });
+    // Open upload modal for retraining
+    setShowUploadModal(s.id);
+  };
+
+  const handleDelete = (s: Subject) => {
+    setConfirmDelete(null);
+    deleteSubject(course.id, s.id);
+    toast.success('Matéria excluída.');
   };
 
   return (
@@ -151,13 +197,39 @@ export default function CoursePage() {
               {course.subjects.map(s => {
                 const sc = statusConfig[s.status];
                 return (
-                  <div key={s.id} className={`bg-white border rounded-lg p-5 transition-all duration-[120ms] ${s.status === 'ready' ? 'border-line hover:border-lime/60 hover:shadow-sm' : 'border-line hover:border-ink/20'}`}>
+                  <div key={s.id} className={`bg-white border rounded-lg p-5 transition-all duration-[120ms] relative ${s.status === 'ready' ? 'border-line hover:border-lime/60 hover:shadow-sm' : 'border-line hover:border-ink/20'}`}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="font-body font-semibold text-[15px] text-ink">{s.name}</p>
-                      <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded-full ${sc.color}`}>
-                        {s.status === 'processing' && <Loader2 size={10} className="inline mr-1 animate-spin" />}
-                        {sc.label}
-                      </span>
+                      <p className="font-body font-semibold text-[15px] text-ink pr-6">{s.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded-full ${sc.color}`}>
+                          {s.status === 'processing' && <Loader2 size={10} className="inline mr-1 animate-spin" />}
+                          {sc.label}
+                        </span>
+                        {/* Menu button */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === s.id ? null : s.id); }}
+                            className="text-muted hover:text-ink transition-colors duration-[120ms] p-0.5 rounded"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                          {menuOpen === s.id && (
+                            <SubjectMenu
+                              subject={s}
+                              onClose={() => setMenuOpen(null)}
+                              onEdit={() => {
+                                setEditSubject(s);
+                                setEditName(s.name);
+                                setEditSemester(s.semester || '');
+                                setMenuOpen(null);
+                              }}
+                              onViewRaw={() => { setViewRawText(s); setMenuOpen(null); }}
+                              onRetrain={() => { setConfirmRetrain(s); setMenuOpen(null); }}
+                              onDelete={() => { setConfirmDelete(s); setMenuOpen(null); }}
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {s.semester && <p className="font-body text-xs text-muted">{s.semester}</p>}
@@ -248,6 +320,112 @@ export default function CoursePage() {
         )}
       </AnimatePresence>
 
+      {/* Modal: Editar Matéria */}
+      <AnimatePresence>
+        {editSubject && (
+          <Modal onClose={() => setEditSubject(null)} title="Editar matéria">
+            <label className="font-body text-[11px] text-muted uppercase tracking-wide mb-1 block">NOME DA MATÉRIA</label>
+            <input
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-4"
+            />
+            <label className="font-body text-[11px] text-muted uppercase tracking-wide mb-1 block">SEMESTRE</label>
+            <input
+              value={editSemester}
+              onChange={e => setEditSemester(e.target.value)}
+              placeholder="Ex: 2025.1"
+              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-6"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditSubject(null)}
+                className="flex-1 border border-line font-body text-sm text-muted py-2.5 rounded-md hover:border-ink hover:text-ink transition-all duration-[120ms]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={!editName.trim()}
+                className="flex-1 bg-ink text-lime font-display font-bold text-[13px] tracking-wide py-2.5 rounded-md hover:bg-graphite transition-all duration-[120ms] disabled:opacity-40"
+              >
+                Salvar
+              </button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Ver Apostila */}
+      <AnimatePresence>
+        {viewRawText && (
+          <Modal onClose={() => setViewRawText(null)} title="📄 Material enviado">
+            {viewRawText.rawText ? (
+              <div className="max-h-[70vh] overflow-y-auto bg-paper border border-line rounded-md p-4">
+                <pre className="font-mono text-sm text-ink whitespace-pre-wrap break-words leading-relaxed">
+                  {viewRawText.rawText}
+                </pre>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-2xl mb-2">📭</p>
+                <p className="font-body text-sm text-muted">Nenhum material salvo para esta matéria.</p>
+              </div>
+            )}
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Dialog: Confirmar Retreinar */}
+      <AnimatePresence>
+        {confirmRetrain && (
+          <Modal onClose={() => setConfirmRetrain(null)} title="🔄 Retreinar matéria">
+            <p className="font-body text-sm text-ink mb-4">
+              Isso vai <strong>apagar todos os conceitos e exercícios</strong> de <strong>{confirmRetrain.name}</strong> e regerar do zero. Continuar?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmRetrain(null)}
+                className="flex-1 border border-line font-body text-sm text-muted py-2.5 rounded-md hover:border-ink hover:text-ink transition-all duration-[120ms]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleRetrain(confirmRetrain)}
+                className="flex-1 bg-ink text-lime font-display font-bold text-[13px] tracking-wide py-2.5 rounded-md hover:bg-graphite transition-all duration-[120ms]"
+              >
+                Retreinar →
+              </button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Dialog: Confirmar Excluir */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <Modal onClose={() => setConfirmDelete(null)} title="🗑️ Excluir matéria">
+            <p className="font-body text-sm text-ink mb-4">
+              Excluir <strong>{confirmDelete.name}</strong>? Esta ação é permanente.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 border border-line font-body text-sm text-muted py-2.5 rounded-md hover:border-ink hover:text-ink transition-all duration-[120ms]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete)}
+                className="flex-1 bg-ember text-white font-display font-bold text-[13px] tracking-wide py-2.5 rounded-md hover:bg-ember/80 transition-all duration-[120ms]"
+              >
+                Excluir permanentemente
+              </button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
       {/* Modal: Upload */}
       <AnimatePresence>
         {showUploadModal && (
@@ -259,10 +437,78 @@ export default function CoursePage() {
       </AnimatePresence>
 
       {/* Graph Generation Overlay */}
-      <GraphGenerationOverlay progress={progress} visible={!!progress} />
+      <GraphGenerationOverlay
+        progress={progress}
+        visible={!!progress}
+        onCancel={handleCancelGeneration}
+      />
     </>
   );
 }
+
+// ─── Subject Menu Dropdown ──────────────────────────
+
+function SubjectMenu({
+  subject,
+  onClose,
+  onEdit,
+  onViewRaw,
+  onRetrain,
+  onDelete,
+}: {
+  subject: Subject;
+  onClose: () => void;
+  onEdit: () => void;
+  onViewRaw: () => void;
+  onRetrain: () => void;
+  onDelete: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useState(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as HTMLElement)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  });
+
+  const items = [
+    { icon: Pencil, label: 'Editar matéria', action: onEdit },
+    { icon: FileSearch, label: 'Ver apostila', action: onViewRaw },
+    ...(subject.status === 'ready'
+      ? [{ icon: RefreshCw, label: 'Retreinar', action: onRetrain }]
+      : []),
+    { icon: Trash2, label: 'Excluir', action: onDelete, danger: true },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-7 z-30 w-48 bg-white border border-line rounded-lg shadow-lg py-1 animate-scale-in"
+    >
+      {items.map((it, i) => (
+        <button
+          key={i}
+          onClick={(e) => { e.stopPropagation(); it.action(); }}
+          className={`w-full text-left px-3 py-2 font-body text-[13px] flex items-center gap-2 transition-colors duration-[120ms] ${
+            (it as any).danger
+              ? 'text-ember hover:bg-ember/5'
+              : 'text-ink hover:bg-paper'
+          }`}
+        >
+          <it.icon size={13} />
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Generic Modal ──────────────────────────────────
 
 function Modal({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
   return (
@@ -273,7 +519,7 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
-      <div className="absolute inset-0 bg-ink/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
       <motion.div
         className="relative bg-white border border-line rounded-lg p-6 w-full max-w-md shadow-lg z-10"
         initial={{ scale: 0.95, opacity: 0 }}
@@ -292,6 +538,8 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
     </motion.div>
   );
 }
+
+// ─── Upload Modal ───────────────────────────────────
 
 function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (file: File | null, text: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);

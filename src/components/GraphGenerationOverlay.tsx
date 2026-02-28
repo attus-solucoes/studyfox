@@ -12,9 +12,10 @@ const MOTIVATIONAL_PHRASES = [
 interface Props {
   progress: ProgressInfo | null;
   visible: boolean;
+  onCancel?: () => void;
 }
 
-export default function GraphGenerationOverlay({ progress, visible }: Props) {
+export default function GraphGenerationOverlay({ progress, visible, onCancel }: Props) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [startTime] = useState(Date.now());
   const [showLongWarning, setShowLongWarning] = useState(false);
@@ -125,6 +126,16 @@ export default function GraphGenerationOverlay({ progress, visible }: Props) {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Cancel button */}
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="mt-4 font-body text-[12px] text-muted hover:text-ink underline underline-offset-2 transition-colors duration-[120ms]"
+              >
+                Cancelar geração
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}

@@ -216,14 +216,15 @@ LAYOUT: x entre 100-900, y entre 80-780. Level 1 no topo (y baixo), level 5 emba
 
 export async function generateGraph(
   input: GenerateGraphInput,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   if (input.file) {
-    return generateGraphFromFile(input.file, onProgress);
+    return generateGraphFromFile(input.file, onProgress, signal);
   }
 
   if (input.text) {
-    return generateGraphFromText(input.text, onProgress);
+    return generateGraphFromText(input.text, onProgress, signal);
   }
 
   throw new Error('Nenhum input fornecido (arquivo ou texto)');
@@ -238,7 +239,8 @@ export { generateGraphFromText };
 
 async function generateGraphFromFile(
   file: File,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   console.log(`[StudyOS AI] Processando arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
 
@@ -252,7 +254,7 @@ async function generateGraphFromFile(
   // TXT/MD → ler como texto
   if (ext === 'txt' || ext === 'md') {
     const text = await readFileAsText(file);
-    return generateGraphFromText(text, onProgress);
+    return generateGraphFromText(text, onProgress, signal);
   }
 
   // PDF → Decidir single-pass ou multi-pass
@@ -263,17 +265,17 @@ async function generateGraphFromFile(
 
     if (useMultiPass) {
       console.log(`[StudyOS AI] PDF grande (${sizeMB.toFixed(1)}MB) → Multi-Pass Deep Extraction`);
-      return multiPassPDF(file, onProgress);
+      return multiPassPDF(file, onProgress, signal);
     } else {
       console.log(`[StudyOS AI] PDF pequeno → Single Pass`);
-      return singlePassPDF(file, onProgress);
+      return singlePassPDF(file, onProgress, signal);
     }
   }
 
   // DOCX e outros
   try {
     const text = await readFileAsText(file);
-    return generateGraphFromText(text, onProgress);
+    return generateGraphFromText(text, onProgress, signal);
   } catch {
     throw new Error('Não foi possível ler este formato. Tente colar o texto manualmente.');
   }
@@ -285,7 +287,8 @@ async function generateGraphFromFile(
 
 async function multiPassPDF(
   file: File,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   const dataUrl = await fileToBase64DataUrl(file);
 
@@ -304,12 +307,12 @@ async function multiPassPDF(
     },
   ];
 
-  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens);
+  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens, signal);
   const chapters: ChapterInfo[] = structureData.chapters || [];
 
   if (chapters.length === 0) {
     console.warn('[StudyOS AI] Nenhum capítulo detectado, fallback para single pass');
-    return singlePassPDF(file, onProgress);
+    return singlePassPDF(file, onProgress, signal);
   }
 
   console.log(`[StudyOS AI] ${chapters.length} capítulos detectados:`, chapters.map(c => c.title));
@@ -347,7 +350,7 @@ async function multiPassPDF(
         },
       ];
 
-      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens);
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal);
       const concepts = chapterData.concepts || [];
       const internalDeps = chapterData.internal_dependencies || [];
 
@@ -369,7 +372,7 @@ async function multiPassPDF(
 
   if (allConcepts.length === 0) {
     console.warn('[StudyOS AI] Nenhum conceito extraído dos capítulos, fallback');
-    return singlePassPDF(file, onProgress);
+    return singlePassPDF(file, onProgress, signal);
   }
 
   // ═══ PASS 3: Conexões entre capítulos ═══
@@ -398,7 +401,7 @@ async function multiPassPDF(
       },
     ];
 
-    const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens);
+    const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens, signal);
     crossEdges = connectData.cross_dependencies || [];
     console.log(`[StudyOS AI] ✓ ${crossEdges.length} conexões cross-chapter`);
   } catch (err: any) {
@@ -507,7 +510,8 @@ function assembleMultiPassGraph(
 
 async function singlePassPDF(
   file: File,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   const dataUrl = await fileToBase64DataUrl(file);
 
@@ -525,14 +529,15 @@ async function singlePassPDF(
     },
   ];
 
-  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens, signal);
   onProgress?.({ step: 'Finalizando grafo...', current: 2, total: 2 });
   return normalizeGraphData(parsed);
 }
 
 async function generateGraphFromText(
   text: string,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   const trimmed = text.trim();
 
@@ -547,7 +552,7 @@ async function generateGraphFromText(
   // Textos grandes: multi-pass via chunking
   if (processedText.length > API_CONFIG.multiPassThresholdChars) {
     console.log(`[StudyOS AI] Texto grande (${processedText.length} chars) → Multi-pass`);
-    return multiPassText(processedText, onProgress);
+    return multiPassText(processedText, onProgress, signal);
   }
 
   onProgress?.({ step: 'Lendo o material...', current: 1, total: 2, detail: `${processedText.length} caracteres` });
@@ -561,7 +566,7 @@ async function generateGraphFromText(
     },
   ];
 
-  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens, signal);
   onProgress?.({ step: 'Finalizando grafo...', current: 2, total: 2 });
   return normalizeGraphData(parsed);
 }
@@ -572,7 +577,8 @@ async function generateGraphFromText(
 
 async function multiPassText(
   fullText: string,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<GenerateGraphResult> {
   // Pass 1: Extrair estrutura
   onProgress?.({ step: 'Identificando estrutura e capítulos...', current: 1, total: 4, detail: 'Analisando organização do material' });
@@ -585,7 +591,7 @@ async function multiPassText(
     },
   ];
 
-  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens);
+  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens, signal);
   const chapters: ChapterInfo[] = structureData.chapters || [];
 
   if (chapters.length === 0) {
@@ -594,7 +600,7 @@ async function multiPassText(
       { role: 'system', content: SINGLE_PASS_PROMPT },
       { role: 'user', content: `Analise:\n\n---\n${fullText}\n---` },
     ];
-    const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+    const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens, signal);
     return normalizeGraphData(parsed);
   }
 
@@ -631,7 +637,7 @@ async function multiPassText(
         },
       ];
 
-      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens);
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal);
       const concepts = chapterData.concepts || [];
       const internalDeps = chapterData.internal_dependencies || [];
 
@@ -666,7 +672,7 @@ async function multiPassText(
         { role: 'system', content: buildConnectionsPrompt(conceptSummaries) },
         { role: 'user', content: 'Identifique dependências entre conceitos de seções diferentes.' },
       ];
-      const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens);
+      const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens, signal);
       crossEdges = connectData.cross_dependencies || [];
     } catch {
       console.warn('[StudyOS AI] Cross-connections falhou');
@@ -682,14 +688,14 @@ async function multiPassText(
 // CHAMADA OPENAI (unificada)
 // ─────────────────────────────────────────────────────
 
-async function callOpenAI(messages: any[], maxTokens: number): Promise<any> {
+async function callOpenAI(messages: any[], maxTokens: number, signal?: AbortSignal): Promise<any> {
   const data = await callOpenAIProxy({
     messages,
     model: MODELS.graphGeneration,
     temperature: API_CONFIG.temperature,
     max_tokens: maxTokens,
     response_format: { type: 'json_object' },
-  });
+  }, signal);
 
   const content = data?.choices?.[0]?.message?.content || '';
   const finishReason = data?.choices?.[0]?.finish_reason;
