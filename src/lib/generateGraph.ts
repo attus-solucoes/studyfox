@@ -4,11 +4,9 @@
 // ═══════════════════════════════════════════════════════
 
 import {
-  OPENAI_API_KEY,
-  OPENAI_BASE_URL,
   MODELS,
   API_CONFIG,
-  rateLimitedFetch,
+  callOpenAIProxy,
   fileToBase64DataUrl,
   validateFile,
 } from '@/lib/gemini';
@@ -218,10 +216,6 @@ export async function generateGraph(
   input: GenerateGraphInput,
   onProgress?: ProgressCallback
 ): Promise<GenerateGraphResult> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('VITE_OPENAI_API_KEY não configurada no .env');
-  }
-
   if (input.file) {
     return generateGraphFromFile(input.file, onProgress);
   }
@@ -687,37 +681,14 @@ async function multiPassText(
 // ─────────────────────────────────────────────────────
 
 async function callOpenAI(messages: any[], maxTokens: number): Promise<any> {
-  const response = await rateLimitedFetch(OPENAI_BASE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODELS.graphGeneration,
-      messages,
-      temperature: API_CONFIG.temperature,
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-    }),
+  const data = await callOpenAIProxy({
+    messages,
+    model: MODELS.graphGeneration,
+    temperature: API_CONFIG.temperature,
+    max_tokens: maxTokens,
+    response_format: { type: 'json_object' },
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('[StudyOS AI] OpenAI Error:', response.status, err);
-
-    if (response.status === 429) throw new Error('Limite de requisições. Aguarde e tente novamente.');
-    if (response.status === 401) throw new Error('API key inválida. Verifique VITE_OPENAI_API_KEY no .env');
-    if (response.status === 400) {
-      if (err.includes('file') || err.includes('content type')) {
-        throw new Error('FALLBACK_TO_TEXT');
-      }
-      throw new Error('Material não pôde ser processado. Tente colar o texto.');
-    }
-    throw new Error(`Erro na API OpenAI: ${response.status}`);
-  }
-
-  const data = await response.json();
   const content = data?.choices?.[0]?.message?.content || '';
   const finishReason = data?.choices?.[0]?.finish_reason;
 

@@ -3,7 +3,7 @@
 // Gera exercícios on-demand por conceito com resolução
 // ═══════════════════════════════════════════════════════
 
-import { OPENAI_API_KEY, OPENAI_BASE_URL, MODELS, rateLimitedFetch } from '@/lib/gemini';
+import { MODELS, callOpenAIProxy } from '@/lib/gemini';
 import type { GraphNode, Exercise } from '@/types/course';
 
 // ─────────────────────────────────────────────────────
@@ -90,41 +90,19 @@ export async function generateExercisesForConcept(
 ): Promise<Exercise[]> {
   console.log(`[StudyOS AI] Gerando exercícios: "${concept.title}" (mastery: ${Math.round(concept.mastery * 100)}%)`);
 
-  if (!OPENAI_API_KEY) {
-    throw new Error('VITE_OPENAI_API_KEY não configurada no .env');
-  }
-
   const conceptContext = buildConceptContext(concept, prerequisiteNames);
 
-  const response = await rateLimitedFetch(OPENAI_BASE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODELS.exerciseGeneration,
-      messages: [
-        { role: 'system', content: EXERCISE_SYSTEM_PROMPT },
-        { role: 'user', content: `Gere exercícios para o seguinte conceito:\n\n${conceptContext}` },
-      ],
-      temperature: 0.8,
-      max_tokens: 4096,
-      response_format: { type: 'json_object' },  // JSON mode
-    }),
+  const data = await callOpenAIProxy({
+    model: MODELS.exerciseGeneration,
+    messages: [
+      { role: 'system', content: EXERCISE_SYSTEM_PROMPT },
+      { role: 'user', content: `Gere exercícios para o seguinte conceito:\n\n${conceptContext}` },
+    ],
+    temperature: 0.8,
+    max_tokens: 4096,
+    response_format: { type: 'json_object' },
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('[StudyOS AI] Exercise Error:', response.status, err);
-
-    if (response.status === 429) {
-      throw new Error('Limite de requisições. Aguarde um momento.');
-    }
-    throw new Error(`Erro ao gerar exercícios: ${response.status}`);
-  }
-
-  const data = await response.json();
   const content = data?.choices?.[0]?.message?.content || '';
 
   if (!content) {

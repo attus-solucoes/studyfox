@@ -1,41 +1,30 @@
 // ═══════════════════════════════════════════════════════
-// STUDYOS — CONFIGURAÇÃO OPENAI API
-// (arquivo mantém nome gemini.ts para compatibilidade de imports)
+// STUDYOS — CONFIGURAÇÃO OPENAI VIA EDGE FUNCTION
 // ═══════════════════════════════════════════════════════
 
-// ─── API Key via .env ───────────────────────────────
-export const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
-
-// Backward compat (outros imports usam esse nome)
-export const GEMINI_API_KEY = OPENAI_API_KEY;
+import { supabase } from '@/integrations/supabase/client';
 
 // ─── Modelos OpenAI ─────────────────────────────────
 export const MODELS = {
-  graphGeneration: 'gpt-4o-mini',       // Rápido, barato, bom pra grafos
-  exerciseGeneration: 'gpt-4o-mini',    // Rápido pra exercícios on-demand
+  graphGeneration: 'gpt-4o-mini',
+  exerciseGeneration: 'gpt-4o-mini',
 } as const;
-
-// ─── Endpoint ───────────────────────────────────────
-export const OPENAI_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
 // ─── Configuração da API ────────────────────────────
 export const API_CONFIG = {
-  maxOutputTokens: 16384,      // gpt-4o-mini suporta até 16K output
-  chapterOutputTokens: 12000,  // Por capítulo no multi-pass
-  structureOutputTokens: 4096, // Para extração de estrutura
+  maxOutputTokens: 16384,
+  chapterOutputTokens: 12000,
+  structureOutputTokens: 4096,
   temperature: 0.7,
   topP: 0.95,
 
-  // Limites de input
-  maxInputChars: 50000,        // Aumentado para textos maiores
+  maxInputChars: 50000,
   minInputChars: 80,
-  maxFileSizeMB: 20,           // PDFs acadêmicos podem ser grandes
+  maxFileSizeMB: 20,
 
-  // Threshold para multi-pass (PDFs grandes)
-  multiPassThresholdPages: 15, // PDFs com +15 páginas usam multi-pass
-  multiPassThresholdChars: 20000, // Textos com +20K chars usam multi-pass
+  multiPassThresholdPages: 15,
+  multiPassThresholdChars: 20000,
 
-  // Tipos aceitos
   supportedMimeTypes: [
     'application/pdf',
     'text/plain',
@@ -43,44 +32,34 @@ export const API_CONFIG = {
   ] as string[],
 } as const;
 
-// ─── Rate Limiting ──────────────────────────────────
-let lastCallTime = 0;
-const MIN_INTERVAL_MS = 1500; // OpenAI tem limites mais generosos
+// ─── Chamada via Edge Function ──────────────────────
+export interface OpenAIRequest {
+  messages: any[];
+  max_tokens?: number;
+  temperature?: number;
+  model?: string;
+  response_format?: { type: string };
+}
 
-export async function rateLimitedFetch(
-  url: string,
-  options: RequestInit
-): Promise<Response> {
-  const now = Date.now();
-  const elapsed = now - lastCallTime;
+export async function callOpenAIProxy(request: OpenAIRequest): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('openai-proxy', {
+    body: request,
+  });
 
-  if (elapsed < MIN_INTERVAL_MS) {
-    const waitTime = MIN_INTERVAL_MS - elapsed;
-    console.log(`[StudyOS] Rate limit: aguardando ${waitTime}ms...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+  if (error) {
+    console.error('[StudyOS] Edge function error:', error);
+    throw new Error(error.message || 'Erro ao chamar IA');
   }
 
-  lastCallTime = Date.now();
-
-  // Retry com backoff para 429
-  let retries = 0;
-  const maxRetries = 2;
-
-  while (retries <= maxRetries) {
-    const response = await fetch(url, options);
-
-    if (response.status === 429 && retries < maxRetries) {
-      retries++;
-      const backoff = retries * 3000;
-      console.warn(`[StudyOS] Rate limit 429, retry ${retries}/${maxRetries} em ${backoff}ms`);
-      await new Promise(resolve => setTimeout(resolve, backoff));
-      continue;
-    }
-
-    return response;
+  // The edge function returns the full OpenAI response or an error object
+  if (data?.error) {
+    const status = data.status || 500;
+    if (status === 429) throw new Error('Limite de requisições. Aguarde e tente novamente.');
+    if (status === 401) throw new Error('API key OpenAI inválida. Verifique o secret OPENAI_API_KEY.');
+    throw new Error(data.error);
   }
 
-  return fetch(url, options);
+  return data;
 }
 
 // ─── Helper: File to Base64 (com data URL prefix) ───
@@ -89,7 +68,6 @@ export function fileToBase64DataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Retorna COM o prefix: "data:application/pdf;base64,..."
       if (!result) {
         reject(new Error('Falha ao converter arquivo para base64'));
         return;
