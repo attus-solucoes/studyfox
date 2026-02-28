@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Brain, BookOpen, Target } from 'lucide-react';
+import { X, Brain, BookOpen, Target, Zap } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { Course } from '@/types/course';
 
@@ -22,13 +22,27 @@ export default function Home() {
   const globalStats = useMemo(() => {
     let totalConcepts = 0;
     let masteredConcepts = 0;
+    let reviewCount = 0;
     for (const c of courses) {
       for (const s of c.subjects) {
+        if (s.status !== 'ready') continue;
         totalConcepts += s.nodes.length;
         masteredConcepts += s.nodes.filter(n => n.mastery >= 0.7).length;
+        // Weak nodes + new unlocked nodes as rough review count
+        for (const n of s.nodes) {
+          if (n.mastery > 0 && n.mastery < 0.3) reviewCount++;
+          if (n.mastery === 0) {
+            const prereqEdges = s.edges.filter(e => e.to === n.id);
+            const allMet = prereqEdges.length === 0 || prereqEdges.every(e => {
+              const prereq = s.nodes.find(pn => pn.id === e.from);
+              return prereq && prereq.mastery >= 0.5;
+            });
+            if (allMet) reviewCount++;
+          }
+        }
       }
     }
-    return { totalConcepts, masteredConcepts };
+    return { totalConcepts, masteredConcepts, reviewCount };
   }, [courses]);
 
   const metrics = [
@@ -93,6 +107,50 @@ export default function Home() {
             );
           })}
         </div>
+
+        {/* Daily Session Card */}
+        {globalStats.totalConcepts > 0 && (
+          <motion.div variants={item} className="mt-6">
+            <div
+              onClick={() => globalStats.reviewCount > 0 ? navigate('/study') : undefined}
+              className={`relative overflow-hidden rounded-lg p-5 border transition-all duration-[120ms] ${
+                globalStats.reviewCount > 0
+                  ? 'bg-ink border-ink cursor-pointer hover:opacity-95'
+                  : 'bg-white border-line'
+              }`}
+            >
+              <Zap
+                size={80}
+                className={`absolute -right-4 -top-4 ${
+                  globalStats.reviewCount > 0 ? 'text-lime/10' : 'text-muted/5'
+                }`}
+                strokeWidth={1}
+              />
+              {globalStats.reviewCount > 0 ? (
+                <div className="relative z-10">
+                  <p className="font-display font-bold text-lg text-lime">
+                    Você tem {globalStats.reviewCount} conceitos para revisar hoje
+                  </p>
+                  <p className="font-body text-xs text-white/50 mt-1">
+                    Sessão estimada: ~{Math.min(25, globalStats.reviewCount * 2)} min
+                  </p>
+                  <span className="inline-block mt-3 font-display font-bold text-[13px] text-ink bg-lime px-5 py-2 rounded-md">
+                    Começar sessão →
+                  </span>
+                </div>
+              ) : (
+                <div className="relative z-10">
+                  <p className="font-display font-bold text-lg text-ink flex items-center gap-2">
+                    ✅ Você está em dia!
+                  </p>
+                  <p className="font-body text-xs text-muted mt-1">
+                    Nenhum conceito para revisar agora. Continue assim!
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* Courses */}
         <motion.div variants={item} className="mt-8">
