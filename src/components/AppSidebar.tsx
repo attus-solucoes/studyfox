@@ -7,7 +7,7 @@ import { useState } from 'react';
 const navItems = [
   { to: '/home', icon: House, label: 'Home' },
   { to: '/progress', icon: BarChart2, label: 'Progresso' },
-  { to: '#', icon: Settings, label: 'Config' },
+  { to: '/config', icon: Settings, label: 'Config' },
 ];
 
 export default function AppSidebar() {

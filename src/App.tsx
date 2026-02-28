@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Subject from "./pages/Subject";
 import Concept from "./pages/Concept";
 import Progress from "./pages/Progress";
+import Config from "./pages/Config";
 import CoursePage from "./pages/CoursePage";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +28,7 @@ const App = () => (
               <Route path="/subject/:id" element={<Subject />} />
               <Route path="/concept/:id" element={<Concept />} />
               <Route path="/progress" element={<Progress />} />
+              <Route path="/config" element={<Config />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
