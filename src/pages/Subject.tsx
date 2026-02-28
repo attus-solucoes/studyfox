@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, BookOpen, Lightbulb, Sigma, Target, AlertTriangle, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import type { GraphNode, GraphEdge } from '@/types/course';
@@ -138,12 +138,33 @@ export default function Subject() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-[80px] h-1 bg-line rounded-full overflow-hidden">
+            <div className="w-[100px] h-1.5 bg-line rounded-full overflow-hidden">
               <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
             </div>
-            <span className="font-body text-[11px] text-muted">{progressPct}%</span>
+            <span className="font-body text-[11px] text-muted">{masteredCount} de {totalConcepts} dominados</span>
           </div>
-          <span className="font-body text-[11px] text-muted">{totalConcepts} conceitos</span>
+          <button
+            onClick={() => {
+              if (!containerRef.current || !nodes.length) return;
+              const minX = Math.min(...nodes.map(n => n.x));
+              const maxX = Math.max(...nodes.map(n => n.x));
+              const minY = Math.min(...nodes.map(n => n.y));
+              const maxY = Math.max(...nodes.map(n => n.y));
+              const graphW = maxX - minX + NODE_W * 2;
+              const graphH = maxY - minY + NODE_H * 2;
+              const rect = containerRef.current.getBoundingClientRect();
+              const scaleX = rect.width / graphW;
+              const scaleY = rect.height / graphH;
+              const scale = Math.min(scaleX, scaleY, 1.2) * 0.85;
+              const cx = (minX + maxX) / 2;
+              const cy = (minY + maxY) / 2;
+              setTransform({ x: rect.width / 2 - cx * scale, y: rect.height / 2 - cy * scale, scale });
+            }}
+            className="text-muted hover:text-ink transition-all duration-[120ms]"
+            title="Resetar zoom"
+          >
+            <Maximize2 size={14} />
+          </button>
         </div>
       </div>
 
@@ -167,14 +188,15 @@ export default function Subject() {
               if (!src || !tgt) return null;
               const cx = (src.x + tgt.x) / 2;
               const cy = (src.y + tgt.y) / 2 - 30;
+              const isHighlighted = hoveredNode && (e.from === hoveredNode || e.to === hoveredNode);
               return (
                 <motion.path
                   key={`e-${i}`}
                   d={`M ${src.x},${src.y} Q ${cx},${cy} ${tgt.x},${tgt.y}`}
                   fill="none"
-                  stroke="#D4CFC6"
-                  strokeWidth={1.5}
-                  style={{ pointerEvents: 'none' }}
+                  stroke={isHighlighted ? '#111110' : '#D4CFC6'}
+                  strokeWidth={isHighlighted ? 2 : 1.5}
+                  style={{ pointerEvents: 'none', transition: 'stroke 120ms, stroke-width 120ms' }}
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
                   transition={{ duration: 0.3, delay: 0.3 + i * 0.04 }}
@@ -207,8 +229,9 @@ export default function Subject() {
                     height={NODE_H}
                     rx={6}
                     fill={style.fill}
-                    stroke={style.stroke}
-                    strokeWidth={node.mastery > 0 && node.mastery < 0.7 ? 1.5 : 1}
+                    stroke={selected?.id === node.id ? '#BFFF00' : style.stroke}
+                    strokeWidth={selected?.id === node.id ? 2.5 : (node.mastery > 0 && node.mastery < 0.7 ? 1.5 : 1)}
+                    style={{ transition: 'stroke 120ms, stroke-width 120ms' }}
                   />
                   <text
                     x={node.x}
@@ -242,7 +265,10 @@ export default function Subject() {
                 transform: 'translateX(-50%)',
               }}
             >
-              <p className="font-semibold text-xs">{hoveredNodeData.title}</p>
+              <p className="font-semibold text-xs">{hoveredNodeData.title}
+                <span className="text-white/50 ml-1.5">Nível {hoveredNodeData.level}</span>
+                <span className="text-lime ml-1.5">{Math.round(hoveredNodeData.mastery * 100)}%</span>
+              </p>
               {hoveredNodeData.description && (
                 <p className="text-[10px] text-white/70 mt-0.5 line-clamp-2">
                   {hoveredNodeData.description.length > 80
@@ -277,24 +303,33 @@ export default function Subject() {
               {selected.description && (
                 <>
                   <div className="h-px bg-line my-4" />
-                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Descrição</span>
-                  <p className="font-body text-[13px] text-ink mt-1">{selected.description}</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <BookOpen size={12} className="text-muted" />
+                    <span className="font-body text-[10px] text-muted uppercase tracking-widest">Descrição</span>
+                  </div>
+                  <p className="font-body text-[13px] text-ink">{selected.description}</p>
                 </>
               )}
 
               {selected.intuition && (
                 <>
                   <div className="h-px bg-line my-4" />
-                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Intuição</span>
-                  <p className="font-body text-[13px] text-ink mt-1">{selected.intuition}</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Lightbulb size={12} className="text-muted" />
+                    <span className="font-body text-[10px] text-muted uppercase tracking-widest">Intuição</span>
+                  </div>
+                  <p className="font-body text-[13px] text-ink">{selected.intuition}</p>
                 </>
               )}
 
               {selected.formula && (
                 <>
                   <div className="h-px bg-line my-4" />
-                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Fórmula</span>
-                  <p className="font-body text-[13px] text-ink mt-1 font-mono bg-paper px-2 py-1 rounded">{selected.formula}</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Sigma size={12} className="text-muted" />
+                    <span className="font-body text-[10px] text-muted uppercase tracking-widest">Fórmula</span>
+                  </div>
+                  <pre className="font-mono text-[13px] text-lime bg-ink px-3 py-2 rounded-md overflow-x-auto">{selected.formula}</pre>
                 </>
               )}
 
@@ -319,7 +354,10 @@ export default function Subject() {
               {selected.keyPoints && selected.keyPoints.length > 0 && (
                 <>
                   <div className="h-px bg-line my-4" />
-                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Pontos-chave</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Target size={12} className="text-muted" />
+                    <span className="font-body text-[10px] text-muted uppercase tracking-widest">Pontos-chave</span>
+                  </div>
                   <ul className="mt-2 space-y-1">
                     {selected.keyPoints.map((kp, i) => (
                       <li key={i} className="flex items-start gap-2">
@@ -335,7 +373,10 @@ export default function Subject() {
               {selected.commonMistakes && selected.commonMistakes.length > 0 && (
                 <>
                   <div className="h-px bg-line my-4" />
-                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Erros comuns</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <AlertTriangle size={12} className="text-muted" />
+                    <span className="font-body text-[10px] text-muted uppercase tracking-widest">Erros comuns</span>
+                  </div>
                   <ul className="mt-2 space-y-1">
                     {selected.commonMistakes.map((cm, i) => (
                       <li key={i} className="flex items-start gap-2">
@@ -380,7 +421,7 @@ export default function Subject() {
 
               <button
                 onClick={() => navigate(`/concept/${selected.id}`)}
-                className="w-full bg-lime text-ink font-display font-bold text-[13px] tracking-wide py-3 rounded-md mt-6 hover:brightness-95 transition-all duration-[120ms]"
+                className="w-full bg-lime text-ink font-display font-bold text-[13px] tracking-wide py-3 rounded-md mt-6 hover:brightness-95 transition-all duration-[120ms] shadow-[0_0_16px_rgba(191,255,0,0.3)]"
               >
                 Estudar agora →
               </button>
