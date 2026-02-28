@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { RefreshCw, Loader2, ChevronRight, BookOpen, Lightbulb, AlertTriangle, Target, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,20 @@ import type { Exercise } from '@/types/course';
 // STUDYOS — PÁGINA DE ESTUDO DE CONCEITO
 // Dinâmica: conectada a dados reais + exercícios AI
 // ═══════════════════════════════════════════════════════
+
+// Componente para renderizar texto com quebras de linha
+function ResolutionText({ text }: { text: string }) {
+  return (
+    <div className="font-body text-[13px] leading-relaxed">
+      {text.split('\n').map((line, i) => (
+        <span key={i}>
+          {line}
+          {i < text.split('\n').length - 1 && <br />}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function Concept() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +67,9 @@ export default function Concept() {
   const dependents = getDependents(subject.id, node.id);
   const exercises = node.exercises || [];
   const currentExercise: Exercise | undefined = exercises[currentExerciseIndex];
+
+  // ─── Breadcrumb ─────────────────────────────────
+  const breadcrumb = `${course.name} / ${subject.name}`;
 
   // ─── Gerar exercícios ─────────────────────────────
   const handleGenerateExercises = async () => {
@@ -158,12 +175,10 @@ export default function Concept() {
               className="font-body text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
             >
               <ArrowLeft size={12} />
-              {subject.name}
+              {breadcrumb}
             </button>
-            <span className="text-muted">/</span>
-            <span className="font-body text-xs text-ink">{node.title}</span>
-            <div className="w-20 h-0.5 bg-line">
-              <div className="h-full bg-lime transition-all duration-500" style={{ width: `${masteryPercent}%` }} />
+            <div className="w-20 h-0.5 bg-line rounded-full overflow-hidden">
+              <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${masteryPercent}%` }} />
             </div>
             <span className="font-body text-[11px] text-muted">{masteryPercent}%</span>
           </div>
@@ -184,22 +199,25 @@ export default function Concept() {
           )}
 
           {/* Conceito / Descrição */}
-          <div className="border-l-2 border-ink bg-white p-5 rounded-r-lg">
-            <span className="font-body text-[10px] text-muted uppercase tracking-wide flex items-center gap-1">
-              <BookOpen size={10} /> Conceito
-            </span>
-            <p className="font-body text-sm text-graphite leading-relaxed mt-2 whitespace-pre-line">{node.description}</p>
-          </div>
+          {node.description && (
+            <div className="border-l-2 border-ink bg-white p-5 rounded-r-lg">
+              <span className="font-body text-[10px] text-muted uppercase tracking-wide flex items-center gap-1">
+                <BookOpen size={10} /> Conceito
+              </span>
+              <p className="font-body text-sm text-graphite leading-relaxed mt-2 whitespace-pre-line">{node.description}</p>
+            </div>
+          )}
 
           {/* Fórmula */}
           {node.formula && (
             <div className="bg-ink rounded-lg p-5">
               <span className="font-body text-[10px] text-muted uppercase tracking-wide">∑ Fórmula</span>
               <p className="font-mono text-[15px] text-lime mt-2">{node.formula}</p>
-              {node.variables && node.variables.length > 0 && node.variables.map((v, i) => (
-                <p key={i} className="font-mono text-[11px] text-muted mt-1">
-                  {v.symbol} = {v.meaning}{v.unit ? ` (${v.unit})` : ''}
-                </p>
+              {node.variables?.map((v, i) => (
+                <div key={i} className="flex items-baseline gap-2 mt-1">
+                  <span className="font-mono text-[12px] text-lime">{v.symbol}</span>
+                  <span className="font-mono text-[11px] text-muted">= {v.meaning}{v.unit ? ` [${v.unit}]` : ''}</span>
+                </div>
               ))}
             </div>
           )}
@@ -212,9 +230,9 @@ export default function Concept() {
               </span>
               <ul className="mt-2 space-y-1.5">
                 {node.keyPoints.map((kp, i) => (
-                  <li key={i} className="font-body text-[13px] text-ink flex items-start gap-2">
-                    <span className="text-lime mt-0.5">▸</span>
-                    <span>{kp}</span>
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-lime text-xs mt-0.5 shrink-0">▸</span>
+                    <span className="font-body text-sm text-ink">{kp}</span>
                   </li>
                 ))}
               </ul>
@@ -229,9 +247,9 @@ export default function Concept() {
               </span>
               <ul className="mt-2 space-y-1.5">
                 {node.commonMistakes.map((cm, i) => (
-                  <li key={i} className="font-body text-[13px] text-graphite flex items-start gap-2">
-                    <span className="text-ember mt-0.5">✗</span>
-                    <span>{cm}</span>
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-ember text-xs mt-0.5 shrink-0">✗</span>
+                    <span className="font-body text-sm text-ink">{cm}</span>
                   </li>
                 ))}
               </ul>
@@ -344,6 +362,20 @@ export default function Concept() {
                     </div>
                   </div>
 
+                  {/* Progress dots (from Lovable UI) */}
+                  {exercises.length > 1 && (
+                    <div className="flex gap-1 mt-2">
+                      {exercises.map((_, i) => (
+                        <div
+                          key={i}
+                          className={`h-0.5 flex-1 rounded-full transition-colors ${
+                            i < currentExerciseIndex ? 'bg-lime' : i === currentExerciseIndex ? 'bg-ink' : 'bg-line'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+
                   <p className="font-body text-sm text-ink leading-relaxed mt-3 whitespace-pre-line">
                     {currentExercise.question}
                   </p>
@@ -376,11 +408,11 @@ export default function Concept() {
                               onClick={() => setSelectedOption(letter)}
                               className={`w-full text-left p-3 rounded-md border-[1.5px] font-body text-sm transition-all duration-150 ${
                                 isSelected
-                                  ? 'border-ink bg-ink/5 text-ink'
+                                  ? 'border-lime bg-lime/10 text-ink'
                                   : 'border-line text-graphite hover:border-ink/30'
                               }`}
                             >
-                              <span className="font-semibold mr-2">{letter}.</span>
+                              <span className="font-mono text-xs text-muted mr-2">{letter}.</span>
                               {opt}
                             </button>
                           );
@@ -394,7 +426,7 @@ export default function Concept() {
                           onClick={() => setAnswer('true')}
                           className={`flex-1 p-3 rounded-md border-[1.5px] font-body text-sm font-semibold transition-all duration-150 ${
                             answer === 'true'
-                              ? 'border-ink bg-ink/5 text-ink'
+                              ? 'border-lime bg-lime/10 text-ink'
                               : 'border-line text-graphite hover:border-ink/30'
                           }`}
                         >
@@ -404,7 +436,7 @@ export default function Concept() {
                           onClick={() => setAnswer('false')}
                           className={`flex-1 p-3 rounded-md border-[1.5px] font-body text-sm font-semibold transition-all duration-150 ${
                             answer === 'false'
-                              ? 'border-ink bg-ink/5 text-ink'
+                              ? 'border-lime bg-lime/10 text-ink'
                               : 'border-line text-graphite hover:border-ink/30'
                           }`}
                         >
@@ -461,19 +493,19 @@ export default function Concept() {
                 >
                   <p className="font-display font-extrabold text-2xl text-ink">✓ Correto!</p>
 
-                  {/* Resolução */}
+                  {/* Resolução com suporte a multiline */}
                   <div className="bg-ink/10 rounded p-3 mt-3">
                     <p className="font-body text-[10px] text-ink/60 uppercase tracking-wide mb-1">Resolução</p>
-                    <p className="font-body text-[13px] text-ink leading-relaxed whitespace-pre-line">
-                      {currentExercise.solution}
-                    </p>
+                    <div className="text-ink">
+                      <ResolutionText text={currentExercise.solution} />
+                    </div>
                   </div>
 
                   {/* Mastery update */}
                   {oldMasteryPercent !== null && newMasteryPercent !== null && (
                     <div className="mt-3">
                       <p className="font-body text-[11px] text-ink/60 mb-1">{oldMasteryPercent}% → {newMasteryPercent}%</p>
-                      <div className="w-full h-1 bg-ink/20 rounded-full">
+                      <div className="w-full h-1 bg-ink/20 rounded-full overflow-hidden">
                         <motion.div
                           className="h-full bg-ink rounded-full"
                           initial={{ width: `${oldMasteryPercent}%` }}
@@ -520,9 +552,9 @@ export default function Concept() {
                         className="overflow-hidden"
                       >
                         <div className="bg-white/10 rounded p-3 mt-1 mb-2">
-                          <p className="font-body text-[13px] text-white/90 leading-relaxed whitespace-pre-line">
-                            {currentExercise.solution}
-                          </p>
+                          <div className="text-white/90">
+                            <ResolutionText text={currentExercise.solution} />
+                          </div>
                           <p className="font-body text-[12px] text-white/70 mt-2">
                             Resposta correta: <span className="font-semibold text-white">{currentExercise.answer}</span>
                           </p>
@@ -549,7 +581,7 @@ export default function Concept() {
               )}
             </AnimatePresence>
 
-            {/* Lista de exercícios (mini nav) */}
+            {/* Mini nav de exercícios */}
             {exercises.length > 1 && exerciseResult === null && !isGenerating && (
               <div className="flex items-center gap-1 mt-3 justify-center">
                 {exercises.map((_, i) => (

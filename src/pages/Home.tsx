@@ -3,14 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Course } from '@/types/course';
-
-const metrics = [
-  { value: '11', label: 'CONCEITOS ESTUDADOS', delta: '+3 essa semana', positive: true },
-  { value: '47', label: 'EXERCÍCIOS FEITOS', delta: '+12 essa semana', positive: true },
-  { value: '73%', label: 'TAXA DE ACERTO', delta: 'meta: 80%', positive: false },
-];
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -22,6 +16,24 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [courseName, setCourseName] = useState('');
   const [courseInstitution, setCourseInstitution] = useState('');
+
+  const globalStats = useMemo(() => {
+    let totalConcepts = 0;
+    let masteredConcepts = 0;
+    for (const c of courses) {
+      for (const s of c.subjects) {
+        totalConcepts += s.nodes.length;
+        masteredConcepts += s.nodes.filter(n => n.mastery >= 0.7).length;
+      }
+    }
+    return { totalConcepts, masteredConcepts };
+  }, [courses]);
+
+  const metrics = [
+    { value: String(globalStats.totalConcepts), label: 'CONCEITOS NO GRAFO', delta: `${globalStats.masteredConcepts} dominados`, positive: globalStats.masteredConcepts > 0 },
+    { value: String(courses.length), label: 'CURSOS ATIVOS', delta: `${courses.reduce((a, c) => a + c.subjects.length, 0)} matérias`, positive: courses.length > 0 },
+    { value: globalStats.totalConcepts > 0 ? Math.round((globalStats.masteredConcepts / globalStats.totalConcepts) * 100) + '%' : '—', label: 'DOMÍNIO GERAL', delta: 'meta: 80%', positive: false },
+  ];
 
   const handleCreate = () => {
     if (!courseName.trim()) return;
@@ -75,13 +87,15 @@ export default function Home() {
           <span className="font-body text-[10px] text-muted uppercase tracking-widest">SEUS CURSOS</span>
 
           {courses.length === 0 ? (
-            <div className="bg-white border-2 border-dashed border-line rounded-lg p-8 text-center mt-3">
-              <p className="text-3xl mb-3">🦊</p>
-              <p className="font-body font-semibold text-base text-ink">Nenhum curso ainda.</p>
-              <p className="font-body text-sm text-muted mb-4">Adicione seu primeiro curso para começar.</p>
+            <div className="bg-white border-2 border-dashed border-line rounded-lg p-10 text-center mt-3">
+              <p className="text-4xl mb-4">🦊</p>
+              <p className="font-display font-bold text-xl text-ink">Comece sua jornada.</p>
+              <p className="font-body text-sm text-muted mb-6 max-w-sm mx-auto">
+                Crie seu primeiro curso, adicione uma matéria e cole o conteúdo da apostila. A IA gera o grafo de conceitos pra você.
+              </p>
               <button
                 onClick={() => setShowModal(true)}
-                className="bg-ink text-lime font-body font-semibold text-[13px] px-6 py-2.5 rounded-md hover:bg-graphite transition-all duration-[120ms]"
+                className="bg-lime text-ink font-display font-bold text-[14px] tracking-wide px-8 py-3 rounded-md hover:brightness-95 transition-all duration-[120ms]"
               >
                 Criar primeiro curso →
               </button>
@@ -89,6 +103,7 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
               {courses.map(c => {
+                const totalNodes = c.subjects.reduce((a, s) => a + s.nodes.length, 0);
                 const avgProgress = c.subjects.length
                   ? Math.round(c.subjects.reduce((a, s) => a + s.progress, 0) / c.subjects.length)
                   : 0;
@@ -100,9 +115,16 @@ export default function Home() {
                   >
                     <div className="flex items-center justify-between mb-0.5">
                       <p className="font-body font-semibold text-[15px] text-ink">{c.name}</p>
-                      <span className="font-body text-[10px] text-muted border border-line px-2 py-0.5 rounded">
-                        {c.subjects.length} matéria{c.subjects.length !== 1 ? 's' : ''}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {totalNodes > 0 && (
+                          <span className="font-mono text-[10px] text-lime bg-ink px-2 py-0.5 rounded">
+                            {totalNodes} conceitos
+                          </span>
+                        )}
+                        <span className="font-body text-[10px] text-muted border border-line px-2 py-0.5 rounded">
+                          {c.subjects.length} matéria{c.subjects.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
                     {c.institution && (
                       <p className="font-body text-xs text-muted">{c.institution}</p>
@@ -119,8 +141,8 @@ export default function Home() {
                         )}
                       </div>
                     )}
-                    <div className="w-full h-0.5 bg-line mt-3">
-                      <div className="h-full bg-lime transition-all duration-500" style={{ width: `${avgProgress}%` }} />
+                    <div className="w-full h-0.5 bg-line mt-3 rounded-full overflow-hidden">
+                      <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${avgProgress}%` }} />
                     </div>
                     <p className="font-body text-[13px] text-muted hover:text-ink transition-fast mt-3">
                       Ver matérias →
@@ -141,7 +163,7 @@ export default function Home() {
         </motion.div>
       </motion.div>
 
-      {/* Modal: Novo Curso */}
+      {/* Modal */}
       <AnimatePresence>
         {showModal && (
           <motion.div

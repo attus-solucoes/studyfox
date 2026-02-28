@@ -33,11 +33,11 @@ export interface GraphNode {
   description: string;       // Explicação completa e autocontida
   intuition: string;         // Analogia intuitiva do cotidiano
   formula: string | null;    // Fórmula matemática se houver
-  variables: FormulaVariable[];   // Variáveis da fórmula explicadas
-  keyPoints: string[];            // Pontos-chave (o que cai na prova)
-  commonMistakes: string[];       // Erros comuns de alunos
-  exercises: Exercise[];          // Exercícios gerados pela IA
-  lastReviewedAt?: string;        // Última revisão (ISO string)
+  variables?: FormulaVariable[];   // Variáveis da fórmula explicadas
+  keyPoints?: string[];            // Pontos-chave (o que cai na prova)
+  commonMistakes?: string[];       // Erros comuns de alunos
+  exercises?: Exercise[];          // Exercícios gerados pela IA
+  lastReviewedAt?: string;         // Última revisão (ISO string)
 }
 
 // ─── Aresta do Grafo (Dependência) ──────────────────
