@@ -7,6 +7,7 @@ import { useApp } from '@/contexts/AppContext';
 import { generateExercisesForConcept } from '@/lib/generateExercises';
 import FormulaRenderer from '@/components/FormulaRenderer';
 import FormulaCalculator from '@/components/FormulaCalculator';
+import ConceptChat from '@/components/ConceptChat';
 import type { Exercise } from '@/types/course';
 
 // ═══════════════════════════════════════════════════════
@@ -620,6 +621,9 @@ export default function Concept() {
           </div>
         </div>
       </div>
+
+      {/* Chat contextual */}
+      <ConceptChat node={node} subject={subject} />
     </motion.div>
   );
 }
