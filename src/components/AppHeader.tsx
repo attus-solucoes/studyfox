@@ -17,9 +17,18 @@ export default function AppHeader() {
     return '';
   };
 
+  const crumbs = getBreadcrumb().split(' / ');
+
   return (
-    <header className="h-12 sticky top-0 z-20 bg-paper border-b border-line flex items-center justify-between px-4 lg:px-6">
-      <span className="font-body text-xs text-muted pl-10 lg:pl-0">{getBreadcrumb()}</span>
+    <header className="h-12 sticky top-0 z-20 bg-paper border-b border-line flex items-center justify-between px-4 lg:px-6 shadow-sm">
+      <div className="flex items-center gap-1 pl-10 lg:pl-0">
+        {crumbs.map((c, i) => (
+          <span key={i} className="flex items-center gap-1">
+            {i > 0 && <span className="font-body text-xs text-muted">/</span>}
+            <span className={`font-body text-xs ${i === crumbs.length - 1 ? 'text-ink font-semibold' : 'text-muted'}`}>{c}</span>
+          </span>
+        ))}
+      </div>
       <div className="flex items-center gap-3">
         <span className="font-body text-[13px] text-ink bg-white border border-line rounded px-2 py-0.5">
           🔥 5
