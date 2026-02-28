@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
 import { generateExercisesForConcept } from '@/lib/generateExercises';
 import FormulaRenderer from '@/components/FormulaRenderer';
+import FormulaCalculator from '@/components/FormulaCalculator';
 import type { Exercise } from '@/types/course';
 
 // ═══════════════════════════════════════════════════════
@@ -226,6 +227,14 @@ export default function Concept() {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Calculadora interativa */}
+          {node.formula && node.variables && node.variables.length >= 2 && (
+            <FormulaCalculator
+              formula={node.formula}
+              variables={node.variables}
+            />
           )}
 
           {/* Key Points */}
