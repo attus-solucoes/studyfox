@@ -20,11 +20,31 @@ interface ConceptChatProps {
   subject: Subject;
 }
 
-const QUICK_QUESTIONS = [
-  'Pode dar um exemplo prático?',
-  'Qual é o erro mais comum neste conceito?',
-  'Como isso cai na prova?',
-];
+function generateChips(node: GraphNode, subject: Subject): string[] {
+  const chips: string[] = [];
+  const name = subject.name.toLowerCase();
+
+  // Content-based chips (most specific first)
+  if (node.formula) chips.push('Como usar esta fórmula na prática?');
+  if ((node.variables?.length || 0) >= 3) chips.push('Qual variável impacta mais o resultado?');
+  if ((node.commonMistakes?.length || 0) > 0) chips.push('Quero evitar os erros mais comuns');
+  if ((node.keyPoints?.length || 0) >= 3) chips.push('O que cai mais na prova sobre isso?');
+  if (node.level >= 3) chips.push('Quais conceitos preciso saber antes deste?');
+
+  // Subject-type chips
+  if (/cálculo|física|termodinâmica|refrigeração|elétrica|mecânica|estrutural/i.test(name)) {
+    chips.push('Resolve um exercício numérico passo a passo');
+  } else if (/história|direito|filosofia|sociologia/i.test(name)) {
+    chips.push('Contextualize isso historicamente');
+  } else if (/anatomia|fisiologia|farmacologia|bioquímica/i.test(name)) {
+    chips.push('Como isso funciona no corpo humano?');
+  }
+
+  // Always include generic
+  chips.push('Pode dar um exemplo do mundo real?');
+
+  return chips.slice(0, 4);
+}
 
 function buildSystemPrompt(node: GraphNode, subject: Subject): string {
   const parts = [
@@ -65,6 +85,7 @@ export default function ConceptChat({ node, subject }: ConceptChatProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const quickChips = generateChips(node, subject);
 
   // Persist to localStorage
   useEffect(() => {
@@ -164,7 +185,7 @@ export default function ConceptChat({ node, subject }: ConceptChatProps) {
 
                 {/* Quick questions */}
                 <div className="mt-5 space-y-2">
-                  {QUICK_QUESTIONS.map((q, i) => (
+                  {quickChips.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => sendMessage(q)}
@@ -207,7 +228,7 @@ export default function ConceptChat({ node, subject }: ConceptChatProps) {
           {/* Quick questions (when there are messages) */}
           {messages.length > 0 && !isLoading && (
             <div className="px-4 pb-2 flex gap-1.5 flex-wrap">
-              {QUICK_QUESTIONS.map((q, i) => (
+              {quickChips.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
