@@ -109,6 +109,7 @@ G9. SEM SUPERFICIALIDADE: Descrições de uma linha são PROIBIDAS. Mínimo 3 fr
       "description": "Explicação completa, profunda e didática. Mínimo 3 frases. Inclua definição, significado e importância.",
       "intuition": "Analogia poderosa usando cotidiano brasileiro que o aluno NUNCA esqueça.",
       "formula": "F = ma (ou null se não houver)",
+      "formula_latex": "F = m \\\\cdot a (ou null). Gere em notação LaTeX REAL: use \\\\frac{}{} para frações, \\\\sum para somatórios, _{} para subscritos, ^{} para superscritos.",
       "variables": [
         { "symbol": "F", "meaning": "Força resultante", "unit": "N" }
       ],
@@ -196,6 +197,7 @@ G10. SEM SUPERFICIALIDADE: Mínimo 3 frases por description e 2 por intuition
       "description": "Explicação completa e profunda. Mínimo 3 frases.",
       "intuition": "Analogia memorável do cotidiano brasileiro.",
       "formula": "F = ma (ou null)",
+      "formula_latex": "F = m \\\\cdot a (ou null). Gere em notação LaTeX REAL: \\\\frac{}{}, \\\\sum, _{}, ^{}.",
       "variables": [{ "symbol": "F", "meaning": "Força resultante", "unit": "N" }],
       "keyPoints": ["O que cairia na prova"],
       "commonMistakes": ["Erro real de alunos"]

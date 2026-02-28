@@ -33,6 +33,7 @@ export interface GraphNode {
   description: string;       // Explicação completa e autocontida
   intuition: string;         // Analogia intuitiva do cotidiano
   formula: string | null;    // Fórmula matemática se houver
+  formula_latex?: string | null; // Fórmula em LaTeX real (KaTeX)
   variables?: FormulaVariable[];   // Variáveis da fórmula explicadas
   keyPoints?: string[];            // Pontos-chave (o que cai na prova)
   commonMistakes?: string[];       // Erros comuns de alunos

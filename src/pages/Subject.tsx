@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { X, BookOpen, Lightbulb, Sigma, Target, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
+import FormulaRenderer from '@/components/FormulaRenderer';
 import type { GraphNode, GraphEdge } from '@/types/course';
 
 import {
@@ -339,14 +340,19 @@ export default function Subject() {
                 </>
               )}
 
-              {selected.formula && (
+              {(selected.formula_latex || selected.formula) && (
                 <>
                   <div className="h-px bg-border my-4" />
                   <div className="flex items-center gap-1.5 mb-1">
                     <Sigma size={12} className="text-muted-foreground" />
                     <span className="font-body text-[10px] text-muted-foreground uppercase tracking-widest">Fórmula</span>
                   </div>
-                  <pre className="font-mono text-[13px] text-accent bg-foreground px-3 py-2 rounded-md overflow-x-auto">{selected.formula}</pre>
+                  <div className="bg-foreground px-3 py-2 rounded-md overflow-x-auto">
+                    <FormulaRenderer
+                      formula={selected.formula_latex || selected.formula!}
+                      className="text-accent"
+                    />
+                  </div>
                 </>
               )}
 
