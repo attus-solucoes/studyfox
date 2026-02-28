@@ -1,32 +1,18 @@
 
 
-## Diagnosis
+## Plan: Disable Email Confirmation on Supabase
 
-After reviewing the full pipeline, the code is structurally sound but has these concrete bugs:
+The goal is to allow users to sign up and immediately access the platform without email verification.
 
-### Issues Found
+### Step 1: Disable email confirmation in Supabase Auth settings
 
-1. **`extractText.ts`** - PDF files read via `readAsText` produce binary garbage that gets cleaned to near-empty strings, triggering the `< 100 chars` check or sending garbage to Gemini. No minimum-length guard inside the extractor itself.
+Go to the Supabase Dashboard → Authentication → Providers → Email and **disable "Confirm email"**. This is a dashboard setting, not a code change.
 
-2. **`generateGraph.ts`** - `JSON.parse` is not wrapped in try/catch, so a malformed Gemini response crashes the whole flow with an uncaught exception. No debug logging exists to diagnose failures. Gemini sometimes wraps JSON in markdown code fences (`\`\`\`json ... \`\`\``) which the current regex doesn't strip.
+**URL:** https://supabase.com/dashboard/project/jwryenhnthmxzlztiamt/auth/providers
 
-3. **`CoursePage.tsx` error card** - No debug hint shown when `status === 'error'`, making it hard to diagnose.
+### Step 2: Update Login.tsx
 
-### Plan
+After signup succeeds, navigate directly to `/home` (already does this). Remove any "check your email" messaging if present in the current code. The `onAuthStateChange` listener in AuthContext will pick up the session automatically since Supabase will return a session immediately on signup when email confirmation is disabled.
 
-**File 1: `src/lib/extractText.ts`**
-- Add PDF detection: if `file.type === 'application/pdf'`, use `readAsArrayBuffer` + chunked `String.fromCharCode` conversion
-- Add guard: if cleaned text < 50 chars, throw descriptive error
-- Keep `extractTextFromString` unchanged
-
-**File 2: `src/lib/generateGraph.ts`**
-- Add `console.log` debug steps (text length, calling API, raw response)
-- Strip markdown code fences before regex match
-- Wrap `JSON.parse` in dedicated try/catch with repair (remove trailing commas, control chars)
-- Add `console.error('ERRO DETALHADO IA:', err)` in catch
-- Verify API key exists before calling
-
-**File 3: `src/pages/CoursePage.tsx`**
-- In the error status section of subject cards, add small debug hint text: "Erro técnico — veja console (F12)"
-- No other UI changes
+No database migrations needed. No edge functions needed.
 
