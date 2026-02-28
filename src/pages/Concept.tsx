@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
 import { generateExercisesForConcept } from '@/lib/generateExercises';
+import FormulaRenderer from '@/components/FormulaRenderer';
 import type { Exercise } from '@/types/course';
 
 // ═══════════════════════════════════════════════════════
@@ -209,14 +210,19 @@ export default function Concept() {
           )}
 
           {/* Fórmula */}
-          {node.formula && (
-            <div className="bg-ink rounded-lg p-5">
-              <span className="font-body text-[10px] text-muted uppercase tracking-wide">∑ Fórmula</span>
-              <p className="font-mono text-[15px] text-lime mt-2">{node.formula}</p>
+          {(node.formula_latex || node.formula) && (
+            <div className="bg-foreground rounded-lg p-5">
+              <span className="font-body text-[10px] text-muted-foreground uppercase tracking-wide">∑ Fórmula</span>
+              <div className="mt-2 text-accent">
+                <FormulaRenderer
+                  formula={node.formula_latex || node.formula!}
+                  className="text-accent"
+                />
+              </div>
               {node.variables?.map((v, i) => (
                 <div key={i} className="flex items-baseline gap-2 mt-1">
-                  <span className="font-mono text-[12px] text-lime">{v.symbol}</span>
-                  <span className="font-mono text-[11px] text-muted">= {v.meaning}{v.unit ? ` [${v.unit}]` : ''}</span>
+                  <span className="font-mono text-[12px] text-accent">{v.symbol}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">= {v.meaning}{v.unit ? ` [${v.unit}]` : ''}</span>
                 </div>
               ))}
             </div>
