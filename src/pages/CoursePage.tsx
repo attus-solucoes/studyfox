@@ -2,6 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'lucide-react';
+import GraphGenerationOverlay from '@/components/GraphGenerationOverlay';
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
@@ -185,29 +186,10 @@ export default function CoursePage() {
                         </button>
                       )}
                       {s.status === 'processing' && (
-                        <div>
-                          <p className="font-body text-[13px] text-ink font-semibold flex items-center gap-1.5">
-                            <Loader2 size={12} className="animate-spin text-lime" />
-                            {progress?.step || 'IA gerando grafo...'}
-                          </p>
-                          {progress && progress.total > 1 && (
-                            <div className="mt-2">
-                              <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
-                                <motion.div
-                                  className="h-full bg-lime rounded-full"
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
-                                  transition={{ duration: 0.5 }}
-                                />
-                              </div>
-                              <p className="font-body text-[11px] text-muted mt-1">
-                                {progress.detail && <span className="text-ink">{progress.detail}</span>}
-                                {progress.detail && ' · '}
-                                Passo {progress.current}/{progress.total}
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                        <p className="font-body text-[13px] text-ink font-semibold flex items-center gap-1.5">
+                          <Loader2 size={12} className="animate-spin text-lime" />
+                          Processando com IA...
+                        </p>
                       )}
                       {s.status === 'error' && (
                         <div>
@@ -275,6 +257,9 @@ export default function CoursePage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Graph Generation Overlay */}
+      <GraphGenerationOverlay progress={progress} visible={!!progress} />
     </>
   );
 }
