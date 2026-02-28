@@ -11,10 +11,10 @@ const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } 
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
 
 const statusConfig: Record<Subject['status'], { label: string; color: string; icon: typeof CheckCircle2 }> = {
-  empty: { label: 'SEM CONTEÚDO', color: 'text-muted border-line', icon: FileText },
-  processing: { label: 'PROCESSANDO', color: 'text-[#D4A017] border-[#D4A017]', icon: Loader2 },
-  ready: { label: 'PRONTO', color: 'text-lime border-lime', icon: CheckCircle2 },
-  error: { label: 'ERRO', color: 'text-ember border-ember', icon: AlertCircle },
+  empty: { label: 'VAZIO', color: 'text-muted bg-paper border-line', icon: FileText },
+  processing: { label: 'PROCESSANDO', color: 'text-[#D4A017] bg-[#D4A017]/10 border-[#D4A017]/30 animate-pulse', icon: Loader2 },
+  ready: { label: 'PRONTO', color: 'text-lime bg-lime/20 border-lime', icon: CheckCircle2 },
+  error: { label: 'ERRO', color: 'text-ember bg-ember/10 border-ember', icon: AlertCircle },
 };
 
 export default function CoursePage() {
@@ -142,31 +142,36 @@ export default function CoursePage() {
               {course.subjects.map(s => {
                 const sc = statusConfig[s.status];
                 return (
-                  <div key={s.id} className="bg-white border border-line rounded-lg p-5 hover:border-ink transition-all duration-150">
+                  <div key={s.id} className={`bg-white border rounded-lg p-5 transition-all duration-[120ms] ${s.status === 'ready' ? 'border-line hover:border-lime/60 hover:shadow-sm' : 'border-line hover:border-ink/20'}`}>
                     <div className="flex items-center justify-between mb-1">
                       <p className="font-body font-semibold text-[15px] text-ink">{s.name}</p>
-                      <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded ${sc.color}`}>
+                      <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded-full ${sc.color}`}>
                         {s.status === 'processing' && <Loader2 size={10} className="inline mr-1 animate-spin" />}
                         {sc.label}
                       </span>
                     </div>
-                    {s.semester && <p className="font-body text-xs text-muted">{s.semester}</p>}
-                    <div className="w-full h-0.5 bg-line mt-3">
-                      <div className="h-full bg-lime transition-all duration-500" style={{ width: `${s.progress}%` }} />
+                    <div className="flex items-center gap-2">
+                      {s.semester && <p className="font-body text-xs text-muted">{s.semester}</p>}
+                      {s.status === 'ready' && s.nodes.length > 0 && (
+                        <span className="font-body text-[10px] text-muted">· {s.nodes.length} conceito{s.nodes.length !== 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    <div className="w-full h-1 bg-line mt-3 rounded-full overflow-hidden">
+                      <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
                     </div>
                     <div className="mt-3">
                       {s.status === 'ready' && (
                         <button
                           onClick={() => navigate(`/subject/${s.id}`)}
-                          className="font-body text-[13px] text-muted hover:text-ink transition-fast"
+                          className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] group"
                         >
-                          Ver grafo →
+                          Ver grafo <span className="inline-block transition-transform duration-[120ms] group-hover:translate-x-1">→</span>
                         </button>
                       )}
                       {s.status === 'empty' && (
                         <button
                           onClick={() => setShowUploadModal(s.id)}
-                          className="font-body text-[13px] text-muted hover:text-ink transition-fast flex items-center gap-1"
+                          className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] flex items-center gap-1"
                         >
                           <Upload size={12} /> Adicionar apostila
                         </button>
@@ -181,7 +186,7 @@ export default function CoursePage() {
                         <div>
                           <button
                             onClick={() => setShowUploadModal(s.id)}
-                            className="font-body text-[13px] text-ember hover:text-ink transition-fast"
+                            className="font-body text-[13px] text-ember hover:text-ink transition-all duration-[120ms]"
                           >
                             Tentar novamente →
                           </button>
@@ -195,9 +200,10 @@ export default function CoursePage() {
 
               <div
                 onClick={() => setShowSubjectModal(true)}
-                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex items-center justify-center hover:border-ink hover:text-ink transition-fast cursor-pointer text-muted"
+                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex flex-col items-center justify-center gap-1 hover:border-ink hover:text-ink transition-all duration-[150ms] cursor-pointer text-muted min-h-[120px]"
               >
-                <span className="font-body text-sm">+ Nova matéria</span>
+                <Plus size={20} strokeWidth={1.5} />
+                <span className="font-body text-sm">Nova matéria</span>
               </div>
             </div>
           )}
@@ -318,18 +324,22 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (fi
               if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
             }}
             onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-150 ${
-              dragOver ? 'border-ink bg-paper' : 'border-line hover:border-ink'
+            className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-all duration-[150ms] ${
+              dragOver ? 'border-ink bg-paper' : file ? 'border-lime/50 bg-lime/5' : 'border-line hover:border-ink/40'
             }`}
           >
-            <Upload size={24} className="mx-auto text-muted mb-2" />
             {file ? (
-              <p className="font-body text-sm text-ink">{file.name}</p>
+              <div className="flex flex-col items-center gap-2">
+                <CheckCircle2 size={28} className="text-lime" />
+                <p className="font-body font-semibold text-sm text-ink">{file.name}</p>
+                <p className="font-body text-[11px] text-muted">Clique para trocar</p>
+              </div>
             ) : (
-              <>
-                <p className="font-body text-sm text-ink">Arraste um arquivo aqui</p>
-                <p className="font-body text-xs text-muted mt-1">PDF, TXT, DOC, DOCX</p>
-              </>
+              <div className="flex flex-col items-center gap-2">
+                <Upload size={32} className="text-muted" />
+                <p className="font-body font-semibold text-sm text-ink">Arraste seu PDF ou clique para selecionar</p>
+                <p className="font-body text-[11px] text-muted">PDF, TXT, DOC, DOCX — até 10MB</p>
+              </div>
             )}
           </div>
           <input
