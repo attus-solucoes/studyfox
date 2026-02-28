@@ -1,3 +1,20 @@
+export interface FormulaVariable {
+  symbol: string;
+  meaning: string;
+  unit: string;
+}
+
+export interface Exercise {
+  id: string;
+  type: 'numeric' | 'multiple_choice';
+  question: string;
+  data?: string[];
+  options?: string[];
+  correctAnswer: string;
+  hint?: string;
+  resolution?: string;
+}
+
 export interface GraphNode {
   id: string;
   title: string;
@@ -8,6 +25,10 @@ export interface GraphNode {
   description: string;
   intuition: string;
   formula: string | null;
+  variables?: FormulaVariable[];
+  keyPoints?: string[];
+  commonMistakes?: string[];
+  exercises?: Exercise[];
 }
 
 export interface GraphEdge {

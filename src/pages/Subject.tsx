@@ -5,14 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import type { GraphNode, GraphEdge } from '@/types/course';
 
-const NODE_W = 96;
-const NODE_H = 34;
+const NODE_W = 140;
+const NODE_H = 44;
 
 function getNodeStyle(mastery: number) {
   if (mastery >= 0.9) return { fill: '#BFFF00', stroke: '#BFFF00', textColor: '#111110' };
   if (mastery >= 0.7) return { fill: '#111110', stroke: '#111110', textColor: '#BFFF00' };
   if (mastery > 0) return { fill: '#FAFAF8', stroke: '#111110', textColor: '#111110' };
   return { fill: '#FAFAF8', stroke: '#D4CFC6', textColor: '#7A7A78' };
+}
+
+function truncateText(text: string, maxChars: number) {
+  return text.length > maxChars ? text.slice(0, maxChars - 1) + '…' : text;
 }
 
 export default function Subject() {
@@ -117,26 +121,30 @@ export default function Subject() {
 
   const masteredCount = nodes.filter(n => n.mastery >= 0.7).length;
   const progressPct = nodes.length ? Math.round((masteredCount / nodes.length) * 100) : 0;
+  const totalConcepts = nodes.length;
 
-  // Tooltip position
   const hoveredNodeData = hoveredNode ? nodeMap.get(hoveredNode) : null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)]">
       {/* Graph header */}
-      <div className="h-10 bg-paper border-b border-line px-4 flex items-center justify-between shrink-0">
+      <div className="h-12 bg-paper border-b border-line px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link to={`/course/${course.id}`} className="font-body text-xs text-muted hover:text-ink transition-fast">
             {course.name}
           </Link>
           <span className="text-muted text-xs">/</span>
           <span className="font-body font-semibold text-[13px] text-ink">{subject.name}</span>
-          <div className="w-[60px] h-0.5 bg-line">
-            <div className="h-full bg-lime" style={{ width: `${progressPct}%` }} />
-          </div>
-          <span className="font-body text-[11px] text-muted">{progressPct}% dominado</span>
         </div>
-        <span className="font-body text-[11px] text-muted">{nodes.length} conceitos</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-[80px] h-1 bg-line rounded-full overflow-hidden">
+              <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+            </div>
+            <span className="font-body text-[11px] text-muted">{progressPct}%</span>
+          </div>
+          <span className="font-body text-[11px] text-muted">{totalConcepts} conceitos</span>
+        </div>
       </div>
 
       <div ref={containerRef} className="flex-1 relative overflow-hidden" style={{ touchAction: 'none' }}>
@@ -177,6 +185,7 @@ export default function Subject() {
             {/* Nodes */}
             {nodes.map((node, i) => {
               const style = getNodeStyle(node.mastery);
+              const maxChars = Math.floor(NODE_W / 7);
               return (
                 <motion.g
                   key={node.id}
@@ -196,7 +205,7 @@ export default function Subject() {
                     y={node.y - NODE_H / 2}
                     width={NODE_W}
                     height={NODE_H}
-                    rx={4}
+                    rx={6}
                     fill={style.fill}
                     stroke={style.stroke}
                     strokeWidth={node.mastery > 0 && node.mastery < 0.7 ? 1.5 : 1}
@@ -206,11 +215,11 @@ export default function Subject() {
                     y={node.y + 4}
                     textAnchor="middle"
                     fill={style.textColor}
-                    fontSize={9}
+                    fontSize={11}
                     fontFamily="DM Sans, sans-serif"
                     className="pointer-events-none select-none"
                   >
-                    {node.title.length > 14 ? node.title.slice(0, 13) + '…' : node.title}
+                    {truncateText(node.title, maxChars)}
                   </text>
                 </motion.g>
               );
@@ -218,7 +227,7 @@ export default function Subject() {
           </g>
         </svg>
 
-        {/* Tooltip (outside transformed group) */}
+        {/* Tooltip */}
         <AnimatePresence>
           {hoveredNodeData && !selected && (
             <motion.div
@@ -226,16 +235,20 @@ export default function Subject() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.1 }}
-              className="absolute pointer-events-none bg-ink text-white font-body text-[11px] px-3 py-1.5 rounded shadow-lg max-w-[200px]"
+              className="absolute pointer-events-none bg-ink text-white font-body text-[11px] px-3 py-2 rounded shadow-lg max-w-[240px]"
               style={{
                 left: hoveredNodeData.x * transform.scale + transform.x,
-                top: hoveredNodeData.y * transform.scale + transform.y - 50,
+                top: hoveredNodeData.y * transform.scale + transform.y - 56,
                 transform: 'translateX(-50%)',
               }}
             >
-              <p className="font-semibold">{hoveredNodeData.title}</p>
+              <p className="font-semibold text-xs">{hoveredNodeData.title}</p>
               {hoveredNodeData.description && (
-                <p className="text-[10px] text-white/70 mt-0.5 line-clamp-2">{hoveredNodeData.description}</p>
+                <p className="text-[10px] text-white/70 mt-0.5 line-clamp-2">
+                  {hoveredNodeData.description.length > 80
+                    ? hoveredNodeData.description.slice(0, 80) + '…'
+                    : hoveredNodeData.description}
+                </p>
               )}
             </motion.div>
           )}
@@ -245,11 +258,11 @@ export default function Subject() {
         <AnimatePresence>
           {selected && (
             <motion.div
-              initial={{ x: 280 }}
+              initial={{ x: 320 }}
               animate={{ x: 0 }}
-              exit={{ x: 280 }}
+              exit={{ x: 320 }}
               transition={{ duration: 0.2 }}
-              className="absolute top-0 right-0 w-[280px] h-full bg-white border-l border-line p-5 overflow-y-auto"
+              className="absolute top-0 right-0 w-[320px] h-full bg-white border-l border-line p-5 overflow-y-auto"
             >
               <button
                 onClick={() => setSelected(null)}
@@ -258,7 +271,7 @@ export default function Subject() {
                 <X size={16} />
               </button>
 
-              <p className="font-body font-semibold text-base text-ink">{selected.title}</p>
+              <p className="font-body font-semibold text-base text-ink pr-6">{selected.title}</p>
               <p className="font-body text-[11px] text-muted mt-0.5">Nível {selected.level}</p>
 
               {selected.description && (
@@ -285,15 +298,64 @@ export default function Subject() {
                 </>
               )}
 
+              {/* Variables */}
+              {selected.variables && selected.variables.length > 0 && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Variáveis</span>
+                  <div className="mt-2 space-y-1.5">
+                    {selected.variables.map((v, i) => (
+                      <div key={i} className="flex items-baseline gap-2">
+                        <span className="font-mono text-xs text-lime bg-ink px-1.5 py-0.5 rounded">{v.symbol}</span>
+                        <span className="font-body text-[12px] text-ink">{v.meaning}</span>
+                        <span className="font-body text-[11px] text-muted ml-auto">[{v.unit}]</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Key Points */}
+              {selected.keyPoints && selected.keyPoints.length > 0 && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Pontos-chave</span>
+                  <ul className="mt-2 space-y-1">
+                    {selected.keyPoints.map((kp, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-lime text-xs mt-0.5 shrink-0">▸</span>
+                        <span className="font-body text-[12px] text-ink">{kp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {/* Common Mistakes */}
+              {selected.commonMistakes && selected.commonMistakes.length > 0 && (
+                <>
+                  <div className="h-px bg-line my-4" />
+                  <span className="font-body text-[10px] text-muted uppercase tracking-widest">Erros comuns</span>
+                  <ul className="mt-2 space-y-1">
+                    {selected.commonMistakes.map((cm, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-ember text-xs mt-0.5 shrink-0">✗</span>
+                        <span className="font-body text-[12px] text-ink">{cm}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
               <div className="h-px bg-line my-4" />
 
               <span className="font-body text-[10px] text-muted uppercase tracking-widest">Domínio</span>
               <p className="font-display font-bold text-[32px] text-ink mt-1">
                 {Math.round(selected.mastery * 100)}%
               </p>
-              <div className="w-full h-1 bg-line mt-1.5">
+              <div className="w-full h-1 bg-line mt-1.5 rounded-full overflow-hidden">
                 <div
-                  className="h-full"
+                  className="h-full rounded-full"
                   style={{
                     width: `${selected.mastery * 100}%`,
                     backgroundColor:
@@ -318,7 +380,7 @@ export default function Subject() {
 
               <button
                 onClick={() => navigate(`/concept/${selected.id}`)}
-                className="w-full bg-ink text-lime font-body font-semibold text-[13px] py-2.5 rounded-md mt-6 hover:bg-graphite transition-fast"
+                className="w-full bg-lime text-ink font-display font-bold text-[13px] tracking-wide py-3 rounded-md mt-6 hover:brightness-95 transition-all duration-[120ms]"
               >
                 Estudar agora →
               </button>
