@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════
 // STUDYOS — GERADOR DE GRAFO DE CONHECIMENTO (OpenAI)
-// Motor de IA com prompt pedagógico + guardrails
+// Motor Multi-Pass: Estrutura → Capítulos → Conexões
 // ═══════════════════════════════════════════════════════
 
 import {
@@ -14,102 +14,7 @@ import {
 } from '@/lib/gemini';
 
 // ─────────────────────────────────────────────────────
-// SYSTEM PROMPT — GUARDRAILS PEDAGÓGICO
-// ─────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `# PAPEL (ROLE)
-Você é o StudyOS AI — um professor universitário expert, pesquisador e designer instrucional de excelência. Sua missão é transformar QUALQUER material acadêmico bruto em um grafo de conhecimento pedagógico completo, profundo e de altíssima qualidade.
-
-Você tem décadas de experiência ensinando em universidades e sabe exatamente como organizar conhecimento de forma que estudantes realmente APRENDAM.
-
-# CONTEXTO (CONTEXT)
-Estudantes de universidades federais brasileiras frequentemente recebem materiais precários:
-- Professores que não explicam direito, apenas passam referências de livros e apostilas
-- Apostilas incompletas, mal formatadas ou puramente teóricas sem exemplos
-- Listas de exercícios sem gabarito e sem resolução
-- Ausência de exemplos práticos e aplicações reais
-- Slides com tópicos soltos sem conexão clara
-
-Seu trabalho é COMPENSAR essas lacunas. Você deve extrair o MÁXIMO do material fornecido e COMPLEMENTAR ABUNDANTEMENTE com seu próprio conhecimento quando o material for insuficiente. O aluno depende de você.
-
-# GUARDRAILS (REGRAS INVIOLÁVEIS)
-G1. IDIOMA: Sempre responda em Português Brasileiro natural e acessível
-G2. FIDELIDADE: Nunca invente informações que CONTRADIZEM o material fonte
-G3. COMPLEMENTAÇÃO: Quando o material for insuficiente, complemente livremente com conhecimento enciclopédico. Use [+] no início de descrições que foram significativamente expandidas além do material original
-G4. ORDEM PEDAGÓGICA: Conceitos DEVEM ser ordenados por dependência de aprendizado — nível 1 = fundamentos base, nível 5 = aplicações avançadas
-G5. PRECISÃO TÉCNICA: Fórmulas, valores numéricos e definições DEVEM ser tecnicamente corretos e verificáveis
-G6. JSON PURO: Retorne APENAS JSON válido, sem nenhum texto fora do objeto JSON
-G7. VOLUME: Extraia entre 12 e 25 conceitos, priorizando PROFUNDIDADE e QUALIDADE sobre quantidade
-G8. COMPLETUDE: Cada conceito DEVE ter TODOS os campos preenchidos com conteúdo substancial (exceto formula/variables que podem ser null/vazio quando não aplicável)
-G9. AUTOCONTIDO: Cada descrição deve ser completa o suficiente para o aluno entender o conceito SEM precisar consultar outro material
-G10. SEM SUPERFICIALIDADE: Descrições de uma linha são PROIBIDAS. Mínimo 3 frases por description e 2 frases por intuition
-
-# CADEIA DE RACIOCÍNIO (CHAIN OF THOUGHT)
-Antes de gerar o JSON, raciocine internamente nesta ordem:
-1. Identifique a matéria/disciplina e a área de conhecimento
-2. Liste TODOS os conceitos fundamentais (mesmo os que o material não menciona explicitamente mas são pré-requisitos)
-3. Organize a árvore de dependências: o que precisa ser aprendido antes do quê?
-4. Para cada conceito: o material cobre isso? Se não, complete com seu conhecimento
-5. Para cada conceito: como um professor EXCELENTE explicaria isso para um aluno brasileiro?
-6. Para cada conceito: quais são os erros REAIS que alunos cometem em provas?
-7. Para cada conceito: quais são os pontos que um professor cobraria em avaliação?
-
-# TRATAMENTO DE MATERIAL PRECÁRIO
-Se o material enviado for:
-- Apenas uma lista de tópicos → Desenvolva CADA tópico profundamente com seu conhecimento
-- Texto mal formatado/OCR ruim → Identifique os conceitos mesmo no caos e reconstrua
-- Muito curto (< 500 chars) → Use os tópicos como semente e expanda com conhecimento completo da disciplina
-- Apenas referências de livros → Use os títulos/capítulos como guia e desenvolva o conteúdo que estaria nesses capítulos
-- Slides com bullets soltos → Conecte os pontos e crie narrativa pedagógica coesa
-- Em outro idioma → Traduza e processe normalmente
-- PDF com fórmulas/tabelas → Extraia e explique cada elemento
-
-# ESPECIFICAÇÃO DO OUTPUT (JSON)
-Retorne um JSON com EXATAMENTE esta estrutura:
-
-{
-  "subject_name": "Nome completo da Matéria/Disciplina",
-  "concepts": [
-    {
-      "id": "node_1",
-      "title": "Nome do Conceito",
-      "level": 1,
-      "x": 200,
-      "y": 100,
-      "description": "Explicação completa, profunda e didática do conceito. Deve ser autocontida — o aluno entende o conceito lendo APENAS isto. Mínimo 3 frases substanciais. Inclua definição, significado e importância.",
-      "intuition": "Analogia poderosa usando contexto do cotidiano brasileiro. Deve criar uma imagem mental que o aluno NUNCA esqueça.",
-      "formula": "F = ma (ou null se não houver fórmula)",
-      "variables": [
-        { "symbol": "F", "meaning": "Força resultante aplicada ao corpo", "unit": "N (Newton)" }
-      ],
-      "keyPoints": [
-        "Ponto essencial 1 que cairia em prova — seja específico",
-        "Ponto essencial 2 — algo que o professor cobraria",
-        "Ponto essencial 3 — detalhe que diferencia nota 7 de nota 10"
-      ],
-      "commonMistakes": [
-        "Erro real e específico que alunos cometem",
-        "Outro erro comum"
-      ]
-    }
-  ],
-  "dependencies": [
-    { "from": "node_1", "to": "node_3", "strength": 0.9 }
-  ]
-}
-
-# CRITÉRIOS DE QUALIDADE
-Q1. DESCRIÇÃO: Autocontida, profunda, mínimo 3 frases. O aluno entende lendo APENAS ela.
-Q2. INTUIÇÃO: Analogia CONCRETA e MEMORÁVEL. Use exemplos do Brasil quando possível (Uber, mercado, futebol, trânsito, cozinha).
-Q3. KEY POINTS: O que o professor perguntaria na prova. Seja ESPECÍFICO, não genérico.
-Q4. COMMON MISTAKES: Erros REAIS que fazem alunos perderem pontos. Seja específico.
-Q5. DEPENDÊNCIAS: Se conceito B requer conhecer A, DEVE existir edge de A→B com strength > 0.5
-Q6. LAYOUT: Distribua coordenadas x entre 100-900 e y entre 80-780. Organize por nível: level 1 no topo (y baixo), level 5 embaixo (y alto). Espalhe horizontalmente (x) para evitar sobreposição. Nós do mesmo nível devem ter y similar.
-Q7. FÓRMULAS: Se o conceito tem fórmula, TODAS as variáveis DEVEM ser explicadas com símbolo, significado e unidade
-Q8. NÍVEIS: Use todos os 5 níveis. Nível 1 = fundamentos/definições. Nível 5 = aplicações complexas/síntese
-Q9. COBERTURA: Inclua conceitos que o material não menciona explicitamente mas são pré-requisitos lógicos necessários`;
-
-// ─────────────────────────────────────────────────────
-// INTERFACE PÚBLICA
+// TIPOS
 // ─────────────────────────────────────────────────────
 
 interface GenerateGraphInput {
@@ -123,21 +28,206 @@ interface GenerateGraphResult {
   edges: any[];
 }
 
-/**
- * Gera um grafo de conhecimento a partir de arquivo ou texto.
- * Usa OpenAI API com JSON mode garantido.
- */
-export async function generateGraph(input: GenerateGraphInput): Promise<GenerateGraphResult> {
+export interface ProgressInfo {
+  step: string;
+  current: number;
+  total: number;
+  detail?: string;
+}
+
+export type ProgressCallback = (info: ProgressInfo) => void;
+
+interface ChapterInfo {
+  id: string;
+  title: string;
+  topics: string[];
+}
+
+// ─────────────────────────────────────────────────────
+// PROMPTS
+// ─────────────────────────────────────────────────────
+
+const BASE_ROLE = `Você é o StudyOS AI — um professor universitário expert, pesquisador e designer instrucional de excelência.
+
+CONTEXTO: Estudantes de universidades federais brasileiras frequentemente recebem materiais precários: professores que não explicam direito, apostilas incompletas, listas sem gabarito. Seu trabalho é COMPENSAR essas lacunas.`;
+
+const STRUCTURE_PROMPT = `${BASE_ROLE}
+
+# TAREFA
+Analise o material acadêmico e extraia a ESTRUTURA de capítulos/seções/tópicos.
+
+# REGRAS
+- Identifique TODOS os capítulos, seções ou grandes temas do material
+- Se não houver capítulos explícitos, divida por temas lógicos
+- Liste os tópicos principais de cada capítulo
+- Retorne APENAS JSON válido
+
+# OUTPUT (JSON)
+{
+  "subject_name": "Nome da Matéria/Disciplina",
+  "chapters": [
+    {
+      "id": "ch_1",
+      "title": "Nome do Capítulo/Seção",
+      "topics": ["Tópico 1", "Tópico 2", "Tópico 3"]
+    }
+  ]
+}
+
+Extraia entre 3 e 12 capítulos. Se o material for curto, extraia pelo menos 2-3 seções temáticas.`;
+
+function buildChapterPrompt(chapter: ChapterInfo, chapterIndex: number, totalChapters: number): string {
+  return `${BASE_ROLE}
+
+# TAREFA
+Extraia conceitos PROFUNDOS do capítulo "${chapter.title}" (capítulo ${chapterIndex + 1} de ${totalChapters}).
+Tópicos deste capítulo: ${chapter.topics.join(', ')}
+
+# GUARDRAILS
+G1. IDIOMA: Português Brasileiro
+G2. FIDELIDADE: Nunca invente informações que contradizem o material
+G3. COMPLEMENTAÇÃO: Quando o material for insuficiente, complemente com conhecimento enciclopédico. Use [+] em descrições expandidas além do material
+G4. PRECISÃO: Fórmulas e definições DEVEM ser tecnicamente corretas
+G5. JSON PURO: Retorne APENAS JSON válido
+G6. VOLUME: Extraia entre 5 e 15 conceitos deste capítulo — PROFUNDIDADE sobre quantidade
+G7. COMPLETUDE: Cada conceito DEVE ter TODOS os campos preenchidos substancialmente
+G8. AUTOCONTIDO: Cada descrição completa o suficiente para entender SEM consultar outro material
+G9. SEM SUPERFICIALIDADE: Descrições de uma linha são PROIBIDAS. Mínimo 3 frases por description
+
+# CADEIA DE RACIOCÍNIO
+1. Liste os conceitos do capítulo (incluindo pré-requisitos implícitos)
+2. Organize por ordem de aprendizado (level 1=base, 5=avançado)
+3. Para cada: como um professor EXCELENTE explicaria?
+4. Para cada: quais erros reais alunos cometem em provas?
+5. Para cada: o que cairia em avaliação?
+
+# OUTPUT (JSON)
+{
+  "concepts": [
+    {
+      "id": "ch${chapterIndex + 1}_node_1",
+      "title": "Nome do Conceito",
+      "level": 1,
+      "description": "Explicação completa, profunda e didática. Mínimo 3 frases. Inclua definição, significado e importância.",
+      "intuition": "Analogia poderosa usando cotidiano brasileiro que o aluno NUNCA esqueça.",
+      "formula": "F = ma (ou null se não houver)",
+      "variables": [
+        { "symbol": "F", "meaning": "Força resultante", "unit": "N" }
+      ],
+      "keyPoints": [
+        "Ponto que cairia em prova — seja específico",
+        "Detalhe que diferencia nota 7 de nota 10"
+      ],
+      "commonMistakes": [
+        "Erro real e específico que alunos cometem"
+      ]
+    }
+  ],
+  "internal_dependencies": [
+    { "from": "ch${chapterIndex + 1}_node_1", "to": "ch${chapterIndex + 1}_node_3", "strength": 0.9 }
+  ]
+}`;
+}
+
+function buildConnectionsPrompt(allConcepts: { id: string; title: string; chapter: string }[]): string {
+  const conceptList = allConcepts.map(c => `- ${c.id}: "${c.title}" (${c.chapter})`).join('\n');
+
+  return `${BASE_ROLE}
+
+# TAREFA
+Analise os conceitos abaixo (extraídos de diferentes capítulos) e identifique DEPENDÊNCIAS ENTRE CAPÍTULOS.
+
+# CONCEITOS
+${conceptList}
+
+# REGRAS
+- Identifique APENAS dependências ENTRE capítulos diferentes (cross-chapter)
+- Se conceito B de capítulo 3 requer conceito A de capítulo 1, crie edge A→B
+- Strength: 0.9 = essencial, 0.5 = útil saber, 0.3 = tangencial
+- Retorne APENAS JSON válido
+
+# OUTPUT (JSON)
+{
+  "cross_dependencies": [
+    { "from": "ch1_node_2", "to": "ch3_node_1", "strength": 0.8 }
+  ]
+}`;
+}
+
+const SINGLE_PASS_PROMPT = `${BASE_ROLE}
+
+# TAREFA
+Transforme o material acadêmico em um grafo de conhecimento pedagógico completo e profundo.
+
+# GUARDRAILS
+G1. IDIOMA: Português Brasileiro natural e acessível
+G2. FIDELIDADE: Nunca invente informações que CONTRADIZEM o material fonte
+G3. COMPLEMENTAÇÃO: Quando insuficiente, complemente com conhecimento enciclopédico. Use [+] em descrições expandidas
+G4. ORDEM PEDAGÓGICA: Conceitos ordenados por dependência — nível 1 = fundamentos, nível 5 = avançado
+G5. PRECISÃO: Fórmulas e definições tecnicamente corretas
+G6. JSON PURO: Retorne APENAS JSON válido
+G7. VOLUME: Extraia entre 12 e 25 conceitos — PROFUNDIDADE sobre quantidade
+G8. COMPLETUDE: Cada conceito com TODOS os campos preenchidos substancialmente
+G9. AUTOCONTIDO: Descrições completas sem consultar outro material
+G10. SEM SUPERFICIALIDADE: Mínimo 3 frases por description e 2 por intuition
+
+# CADEIA DE RACIOCÍNIO
+1. Identifique matéria e área de conhecimento
+2. Liste TODOS os conceitos (incluindo pré-requisitos implícitos)
+3. Organize árvore de dependências
+4. Para cada: como um professor EXCELENTE explicaria?
+5. Para cada: erros REAIS em provas?
+6. Para cada: pontos de avaliação?
+
+# TRATAMENTO DE MATERIAL PRECÁRIO
+- Lista de tópicos → Desenvolva cada tópico profundamente
+- Texto mal formatado → Identifique conceitos e reconstrua
+- Muito curto → Use tópicos como semente e expanda
+- Referências de livros → Desenvolva o conteúdo esperado
+- Slides com bullets → Crie narrativa pedagógica coesa
+
+# OUTPUT (JSON)
+{
+  "subject_name": "Nome da Matéria",
+  "concepts": [
+    {
+      "id": "node_1",
+      "title": "Nome do Conceito",
+      "level": 1,
+      "x": 200, "y": 100,
+      "description": "Explicação completa e profunda. Mínimo 3 frases.",
+      "intuition": "Analogia memorável do cotidiano brasileiro.",
+      "formula": "F = ma (ou null)",
+      "variables": [{ "symbol": "F", "meaning": "Força resultante", "unit": "N" }],
+      "keyPoints": ["O que cairia na prova"],
+      "commonMistakes": ["Erro real de alunos"]
+    }
+  ],
+  "dependencies": [
+    { "from": "node_1", "to": "node_3", "strength": 0.9 }
+  ]
+}
+
+LAYOUT: x entre 100-900, y entre 80-780. Level 1 no topo (y baixo), level 5 embaixo.`;
+
+// ─────────────────────────────────────────────────────
+// INTERFACE PÚBLICA
+// ─────────────────────────────────────────────────────
+
+export async function generateGraph(
+  input: GenerateGraphInput,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
   if (!OPENAI_API_KEY) {
     throw new Error('VITE_OPENAI_API_KEY não configurada no .env');
   }
 
   if (input.file) {
-    return generateGraphFromFile(input.file);
+    return generateGraphFromFile(input.file, onProgress);
   }
 
   if (input.text) {
-    return generateGraphFromText(input.text);
+    return generateGraphFromText(input.text, onProgress);
   }
 
   throw new Error('Nenhum input fornecido (arquivo ou texto)');
@@ -147,10 +237,13 @@ export async function generateGraph(input: GenerateGraphInput): Promise<Generate
 export { generateGraphFromText };
 
 // ─────────────────────────────────────────────────────
-// GERAÇÃO A PARTIR DE ARQUIVO (PDF → OpenAI multimodal)
+// GERAÇÃO A PARTIR DE ARQUIVO
 // ─────────────────────────────────────────────────────
 
-async function generateGraphFromFile(file: File): Promise<GenerateGraphResult> {
+async function generateGraphFromFile(
+  file: File,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
   console.log(`[StudyOS AI] Processando arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
 
   const validation = validateFile(file);
@@ -163,51 +256,288 @@ async function generateGraphFromFile(file: File): Promise<GenerateGraphResult> {
   // TXT/MD → ler como texto
   if (ext === 'txt' || ext === 'md') {
     const text = await readFileAsText(file);
-    return generateGraphFromText(text);
+    return generateGraphFromText(text, onProgress);
   }
 
-  // PDF → enviar como file content para OpenAI
+  // PDF → Decidir single-pass ou multi-pass
   if (ext === 'pdf') {
-    const dataUrl = await fileToBase64DataUrl(file);
-    console.log(`[StudyOS AI] Enviando PDF ao OpenAI (${MODELS.graphGeneration})...`);
+    const sizeMB = file.size / (1024 * 1024);
+    // PDFs > ~1MB (~15+ páginas) usam multi-pass
+    const useMultiPass = sizeMB > 0.5;
 
-    const messages: any[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'file',
-            file: {
-              filename: file.name,
-              file_data: dataUrl,
-            },
-          },
-          {
-            type: 'text',
-            text: 'Analise o documento acadêmico acima e gere o grafo de conhecimento pedagógico completo. Extraia o máximo de valor possível deste material.',
-          },
-        ],
-      },
-    ];
-
-    return callOpenAI(messages);
+    if (useMultiPass) {
+      console.log(`[StudyOS AI] PDF grande (${sizeMB.toFixed(1)}MB) → Multi-Pass Deep Extraction`);
+      return multiPassPDF(file, onProgress);
+    } else {
+      console.log(`[StudyOS AI] PDF pequeno → Single Pass`);
+      return singlePassPDF(file, onProgress);
+    }
   }
 
-  // DOCX e outros → tentar ler como texto
+  // DOCX e outros
   try {
     const text = await readFileAsText(file);
-    return generateGraphFromText(text);
+    return generateGraphFromText(text, onProgress);
   } catch {
     throw new Error('Não foi possível ler este formato. Tente colar o texto manualmente.');
   }
 }
 
 // ─────────────────────────────────────────────────────
-// GERAÇÃO A PARTIR DE TEXTO
+// MULTI-PASS DEEP EXTRACTION (PDFs grandes)
 // ─────────────────────────────────────────────────────
 
-async function generateGraphFromText(text: string): Promise<GenerateGraphResult> {
+async function multiPassPDF(
+  file: File,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
+  const dataUrl = await fileToBase64DataUrl(file);
+
+  // ═══ PASS 1: Extrair estrutura ═══
+  onProgress?.({ step: 'Analisando estrutura do material...', current: 1, total: 4, detail: 'Identificando capítulos e tópicos' });
+  console.log('[StudyOS AI] Pass 1: Extraindo estrutura...');
+
+  const structureMessages: any[] = [
+    { role: 'system', content: STRUCTURE_PROMPT },
+    {
+      role: 'user',
+      content: [
+        { type: 'file', file: { filename: file.name, file_data: dataUrl } },
+        { type: 'text', text: 'Analise a estrutura completa deste material acadêmico. Identifique todos os capítulos, seções e tópicos.' },
+      ],
+    },
+  ];
+
+  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens);
+  const chapters: ChapterInfo[] = structureData.chapters || [];
+
+  if (chapters.length === 0) {
+    console.warn('[StudyOS AI] Nenhum capítulo detectado, fallback para single pass');
+    return singlePassPDF(file, onProgress);
+  }
+
+  console.log(`[StudyOS AI] ${chapters.length} capítulos detectados:`, chapters.map(c => c.title));
+  const subjectName = structureData.subject_name || '';
+
+  // ═══ PASS 2: Extração profunda por capítulo ═══
+  const totalSteps = chapters.length + 3; // structure + N chapters + connections + assembly
+  const allConcepts: any[] = [];
+  const allInternalEdges: any[] = [];
+
+  for (let i = 0; i < chapters.length; i++) {
+    const chapter = chapters[i];
+    onProgress?.({
+      step: `Processando capítulo ${i + 1} de ${chapters.length}`,
+      current: i + 2,
+      total: totalSteps,
+      detail: chapter.title,
+    });
+
+    console.log(`[StudyOS AI] Pass 2.${i + 1}: Capítulo "${chapter.title}"...`);
+
+    try {
+      const chapterPrompt = buildChapterPrompt(chapter, i, chapters.length);
+      const chapterMessages: any[] = [
+        { role: 'system', content: chapterPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'file', file: { filename: file.name, file_data: dataUrl } },
+            {
+              type: 'text',
+              text: `Foque EXCLUSIVAMENTE no capítulo "${chapter.title}" deste material. Tópicos a cobrir: ${chapter.topics.join(', ')}. Extraia conceitos profundos com explicações completas, fórmulas, pontos-chave e erros comuns.`,
+            },
+          ],
+        },
+      ];
+
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens);
+      const concepts = chapterData.concepts || [];
+      const internalDeps = chapterData.internal_dependencies || [];
+
+      // Tag each concept with chapter info
+      concepts.forEach((c: any) => {
+        c._chapter = chapter.title;
+        c._chapterIndex = i;
+      });
+
+      allConcepts.push(...concepts);
+      allInternalEdges.push(...internalDeps);
+
+      console.log(`[StudyOS AI] ✓ Cap. ${i + 1}: ${concepts.length} conceitos`);
+    } catch (err: any) {
+      console.error(`[StudyOS AI] ✗ Cap. ${i + 1} falhou:`, err?.message);
+      // Continue with other chapters even if one fails
+    }
+  }
+
+  if (allConcepts.length === 0) {
+    console.warn('[StudyOS AI] Nenhum conceito extraído dos capítulos, fallback');
+    return singlePassPDF(file, onProgress);
+  }
+
+  // ═══ PASS 3: Conexões entre capítulos ═══
+  onProgress?.({
+    step: 'Conectando conceitos entre capítulos...',
+    current: chapters.length + 2,
+    total: totalSteps,
+    detail: `${allConcepts.length} conceitos encontrados`,
+  });
+
+  console.log(`[StudyOS AI] Pass 3: Conectando ${allConcepts.length} conceitos...`);
+
+  let crossEdges: any[] = [];
+  try {
+    const conceptSummaries = allConcepts.map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      chapter: c._chapter || 'unknown',
+    }));
+
+    const connectMessages = [
+      { role: 'system', content: buildConnectionsPrompt(conceptSummaries) },
+      {
+        role: 'user',
+        content: `Identifique as dependências entre conceitos de capítulos DIFERENTES. Quais conceitos de capítulos anteriores são pré-requisitos para conceitos em capítulos posteriores?`,
+      },
+    ];
+
+    const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens);
+    crossEdges = connectData.cross_dependencies || [];
+    console.log(`[StudyOS AI] ✓ ${crossEdges.length} conexões cross-chapter`);
+  } catch (err: any) {
+    console.warn('[StudyOS AI] Conexões cross-chapter falharam:', err?.message);
+  }
+
+  // ═══ PASS 4: Assembly ═══
+  onProgress?.({
+    step: 'Montando grafo final...',
+    current: totalSteps,
+    total: totalSteps,
+    detail: `${allConcepts.length} conceitos, ${allInternalEdges.length + crossEdges.length} conexões`,
+  });
+
+  console.log('[StudyOS AI] Pass 4: Montando grafo final...');
+
+  return assembleMultiPassGraph(subjectName, allConcepts, allInternalEdges, crossEdges, chapters);
+}
+
+// ─────────────────────────────────────────────────────
+// ASSEMBLY DO GRAFO MULTI-PASS
+// ─────────────────────────────────────────────────────
+
+function assembleMultiPassGraph(
+  subjectName: string,
+  allConcepts: any[],
+  internalEdges: any[],
+  crossEdges: any[],
+  chapters: ChapterInfo[]
+): GenerateGraphResult {
+  // Normalizar conceitos com posição auto-calculada
+  const concepts = allConcepts.map((c: any, globalIndex: number) => {
+    const chapterIndex = c._chapterIndex || 0;
+    const chapConcepts = allConcepts.filter((x: any) => x._chapterIndex === chapterIndex);
+    const localIndex = chapConcepts.indexOf(c);
+
+    // Layout: capítulos em faixas horizontais, conceitos dentro organizados por nível
+    const level = Math.min(5, Math.max(1, Number(c.level) || 1));
+    const xSpread = 800; // 100 to 900
+    const ySpread = 700; // 80 to 780
+    const chapCount = chapters.length || 1;
+
+    // X baseado no nível + spread dentro do nível
+    const levelConcepts = chapConcepts.filter((x: any) => (x.level || 1) === level);
+    const levelIndex = levelConcepts.indexOf(c);
+    const levelCount = Math.max(1, levelConcepts.length);
+    const x = Math.round(100 + (levelIndex / levelCount) * xSpread + (Math.random() * 40 - 20));
+
+    // Y baseado no nível (nível 1 no topo, nível 5 embaixo) + offset por capítulo
+    const baseY = 80 + ((level - 1) / 4) * ySpread;
+    const chapterOffset = (chapterIndex / chapCount) * 30 - 15; // Sutil
+    const y = Math.round(baseY + chapterOffset + (Math.random() * 20 - 10));
+
+    return {
+      id: c.id || `node_${globalIndex + 1}`,
+      title: String(c.title || `Conceito ${globalIndex + 1}`),
+      level: level,
+      x: Math.min(900, Math.max(100, x)),
+      y: Math.min(780, Math.max(80, y)),
+      mastery: 0,
+      description: String(c.description || ''),
+      intuition: String(c.intuition || ''),
+      formula: c.formula && c.formula !== 'null' && c.formula !== 'None' ? String(c.formula) : null,
+      variables: Array.isArray(c.variables)
+        ? c.variables.map((v: any) => ({
+            symbol: String(v.symbol || ''),
+            meaning: String(v.meaning || ''),
+            unit: v.unit ? String(v.unit) : undefined,
+          }))
+        : [],
+      keyPoints: Array.isArray(c.keyPoints) ? c.keyPoints.filter(Boolean).map(String) : [],
+      commonMistakes: Array.isArray(c.commonMistakes) ? c.commonMistakes.filter(Boolean).map(String) : [],
+      exercises: [],
+      lastReviewedAt: undefined,
+    };
+  });
+
+  // Merge all edges
+  const nodeIds = new Set(concepts.map((n: any) => n.id));
+  const allEdges = [...internalEdges, ...crossEdges];
+  const edges = allEdges
+    .filter((d: any) => nodeIds.has(d.from) && nodeIds.has(d.to) && d.from !== d.to)
+    .map((d: any) => ({
+      from: String(d.from),
+      to: String(d.to),
+      strength: Math.min(1, Math.max(0, Number(d.strength) || 0.5)),
+    }));
+
+  // Deduplicate edges
+  const edgeSet = new Set<string>();
+  const uniqueEdges = edges.filter((e: any) => {
+    const key = `${e.from}->${e.to}`;
+    if (edgeSet.has(key)) return false;
+    edgeSet.add(key);
+    return true;
+  });
+
+  console.log(`[StudyOS AI] ✓ Grafo final: ${concepts.length} conceitos, ${uniqueEdges.length} dependências`);
+
+  return { subjectName, concepts, edges: uniqueEdges };
+}
+
+// ─────────────────────────────────────────────────────
+// SINGLE PASS (PDFs pequenos e textos)
+// ─────────────────────────────────────────────────────
+
+async function singlePassPDF(
+  file: File,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
+  const dataUrl = await fileToBase64DataUrl(file);
+
+  onProgress?.({ step: 'Analisando material...', current: 1, total: 2, detail: file.name });
+  console.log(`[StudyOS AI] Single pass: ${file.name} (${MODELS.graphGeneration})`);
+
+  const messages: any[] = [
+    { role: 'system', content: SINGLE_PASS_PROMPT },
+    {
+      role: 'user',
+      content: [
+        { type: 'file', file: { filename: file.name, file_data: dataUrl } },
+        { type: 'text', text: 'Analise o documento acadêmico acima e gere o grafo de conhecimento pedagógico completo. Extraia o máximo de valor possível deste material.' },
+      ],
+    },
+  ];
+
+  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+  onProgress?.({ step: 'Montando grafo...', current: 2, total: 2 });
+  return normalizeGraphData(parsed);
+}
+
+async function generateGraphFromText(
+  text: string,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
   const trimmed = text.trim();
 
   if (trimmed.length < API_CONFIG.minInputChars) {
@@ -217,24 +547,146 @@ async function generateGraphFromText(text: string): Promise<GenerateGraphResult>
   }
 
   const processedText = trimmed.substring(0, API_CONFIG.maxInputChars);
-  console.log(`[StudyOS AI] Processando texto: ${processedText.length} chars`);
+
+  // Textos grandes: multi-pass via chunking
+  if (processedText.length > API_CONFIG.multiPassThresholdChars) {
+    console.log(`[StudyOS AI] Texto grande (${processedText.length} chars) → Multi-pass`);
+    return multiPassText(processedText, onProgress);
+  }
+
+  onProgress?.({ step: 'Analisando material...', current: 1, total: 2, detail: `${processedText.length} caracteres` });
+  console.log(`[StudyOS AI] Single pass texto: ${processedText.length} chars`);
 
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: SINGLE_PASS_PROMPT },
     {
       role: 'user',
       content: `Analise o conteúdo acadêmico abaixo e gere o grafo de conhecimento pedagógico completo:\n\n---\n${processedText}\n---`,
     },
   ];
 
-  return callOpenAI(messages);
+  const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+  onProgress?.({ step: 'Montando grafo...', current: 2, total: 2 });
+  return normalizeGraphData(parsed);
+}
+
+// ─────────────────────────────────────────────────────
+// MULTI-PASS PARA TEXTOS GRANDES
+// ─────────────────────────────────────────────────────
+
+async function multiPassText(
+  fullText: string,
+  onProgress?: ProgressCallback
+): Promise<GenerateGraphResult> {
+  // Pass 1: Extrair estrutura
+  onProgress?.({ step: 'Analisando estrutura do material...', current: 1, total: 4, detail: 'Identificando seções' });
+
+  const structureMessages = [
+    { role: 'system', content: STRUCTURE_PROMPT },
+    {
+      role: 'user',
+      content: `Analise a estrutura deste material acadêmico:\n\n---\n${fullText.substring(0, 30000)}\n---`,
+    },
+  ];
+
+  const structureData = await callOpenAI(structureMessages, API_CONFIG.structureOutputTokens);
+  const chapters: ChapterInfo[] = structureData.chapters || [];
+
+  if (chapters.length === 0) {
+    // Fallback single pass
+    const messages = [
+      { role: 'system', content: SINGLE_PASS_PROMPT },
+      { role: 'user', content: `Analise:\n\n---\n${fullText}\n---` },
+    ];
+    const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
+    return normalizeGraphData(parsed);
+  }
+
+  const subjectName = structureData.subject_name || '';
+  const totalSteps = chapters.length + 3;
+  const allConcepts: any[] = [];
+  const allInternalEdges: any[] = [];
+
+  // Pass 2: Capítulo por capítulo
+  // Dividir texto em chunks estimados por capítulo
+  const chunkSize = Math.ceil(fullText.length / chapters.length);
+
+  for (let i = 0; i < chapters.length; i++) {
+    const chapter = chapters[i];
+    onProgress?.({
+      step: `Processando seção ${i + 1} de ${chapters.length}`,
+      current: i + 2,
+      total: totalSteps,
+      detail: chapter.title,
+    });
+
+    // Estimar chunk de texto para este capítulo
+    const startPos = Math.max(0, i * chunkSize - 500); // overlap
+    const endPos = Math.min(fullText.length, (i + 1) * chunkSize + 500);
+    const chapterText = fullText.substring(startPos, endPos);
+
+    try {
+      const chapterPrompt = buildChapterPrompt(chapter, i, chapters.length);
+      const chapterMessages = [
+        { role: 'system', content: chapterPrompt },
+        {
+          role: 'user',
+          content: `Foque no capítulo "${chapter.title}". Texto relevante:\n\n---\n${chapterText}\n---`,
+        },
+      ];
+
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens);
+      const concepts = chapterData.concepts || [];
+      const internalDeps = chapterData.internal_dependencies || [];
+
+      concepts.forEach((c: any) => {
+        c._chapter = chapter.title;
+        c._chapterIndex = i;
+      });
+
+      allConcepts.push(...concepts);
+      allInternalEdges.push(...internalDeps);
+      console.log(`[StudyOS AI] ✓ Seção ${i + 1}: ${concepts.length} conceitos`);
+    } catch (err: any) {
+      console.error(`[StudyOS AI] ✗ Seção ${i + 1} falhou:`, err?.message);
+    }
+  }
+
+  // Pass 3: Conexões
+  onProgress?.({
+    step: 'Conectando conceitos...',
+    current: chapters.length + 2,
+    total: totalSteps,
+    detail: `${allConcepts.length} conceitos`,
+  });
+
+  let crossEdges: any[] = [];
+  if (allConcepts.length > 3) {
+    try {
+      const conceptSummaries = allConcepts.map((c: any) => ({
+        id: c.id, title: c.title, chapter: c._chapter || '',
+      }));
+      const connectMessages = [
+        { role: 'system', content: buildConnectionsPrompt(conceptSummaries) },
+        { role: 'user', content: 'Identifique dependências entre conceitos de seções diferentes.' },
+      ];
+      const connectData = await callOpenAI(connectMessages, API_CONFIG.structureOutputTokens);
+      crossEdges = connectData.cross_dependencies || [];
+    } catch {
+      console.warn('[StudyOS AI] Cross-connections falhou');
+    }
+  }
+
+  // Assembly
+  onProgress?.({ step: 'Montando grafo final...', current: totalSteps, total: totalSteps });
+  return assembleMultiPassGraph(subjectName, allConcepts, allInternalEdges, crossEdges, chapters);
 }
 
 // ─────────────────────────────────────────────────────
 // CHAMADA OPENAI (unificada)
 // ─────────────────────────────────────────────────────
 
-async function callOpenAI(messages: any[]): Promise<GenerateGraphResult> {
+async function callOpenAI(messages: any[], maxTokens: number): Promise<any> {
   const response = await rateLimitedFetch(OPENAI_BASE_URL, {
     method: 'POST',
     headers: {
@@ -245,8 +697,8 @@ async function callOpenAI(messages: any[]): Promise<GenerateGraphResult> {
       model: MODELS.graphGeneration,
       messages,
       temperature: API_CONFIG.temperature,
-      max_tokens: API_CONFIG.maxOutputTokens,
-      response_format: { type: 'json_object' },  // JSON mode garantido!
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
     }),
   });
 
@@ -254,42 +706,27 @@ async function callOpenAI(messages: any[]): Promise<GenerateGraphResult> {
     const err = await response.text();
     console.error('[StudyOS AI] OpenAI Error:', response.status, err);
 
-    if (response.status === 429) {
-      throw new Error('Limite de requisições atingido. Aguarde um momento e tente novamente.');
-    }
-    if (response.status === 401) {
-      throw new Error('API key inválida. Verifique VITE_OPENAI_API_KEY no .env');
-    }
+    if (response.status === 429) throw new Error('Limite de requisições. Aguarde e tente novamente.');
+    if (response.status === 401) throw new Error('API key inválida. Verifique VITE_OPENAI_API_KEY no .env');
     if (response.status === 400) {
-      // Se falhar com file content, tentar extrair texto
       if (err.includes('file') || err.includes('content type')) {
-        console.warn('[StudyOS AI] File content não suportado, tentando fallback...');
         throw new Error('FALLBACK_TO_TEXT');
       }
-      throw new Error('Material não pôde ser processado. Tente colar o texto manualmente.');
+      throw new Error('Material não pôde ser processado. Tente colar o texto.');
     }
     throw new Error(`Erro na API OpenAI: ${response.status}`);
   }
 
   const data = await response.json();
-
-  // Extrair conteúdo da resposta
   const content = data?.choices?.[0]?.message?.content || '';
   const finishReason = data?.choices?.[0]?.finish_reason;
 
-  console.log('[StudyOS AI] Resposta recebida:', content.length, 'chars, finish:', finishReason);
+  console.log('[StudyOS AI] Resposta:', content.length, 'chars, finish:', finishReason);
 
-  if (!content) {
-    throw new Error('A IA retornou resposta vazia. Tente novamente com mais conteúdo.');
-  }
+  if (!content) throw new Error('IA retornou resposta vazia.');
+  if (finishReason === 'length') console.warn('[StudyOS AI] Output truncado por limite de tokens');
 
-  if (finishReason === 'length') {
-    console.warn('[StudyOS AI] Output truncado por limite de tokens');
-  }
-
-  // ─── Parse (JSON mode garante JSON válido, mas tratamos edge cases) ───
-  const parsed = parseAIResponse(content);
-  return normalizeGraphData(parsed);
+  return parseAIResponse(content);
 }
 
 // ─────────────────────────────────────────────────────
@@ -297,23 +734,17 @@ async function callOpenAI(messages: any[]): Promise<GenerateGraphResult> {
 // ─────────────────────────────────────────────────────
 
 function parseAIResponse(rawText: string): any {
-  // Com JSON mode do OpenAI, o output já é JSON válido na maioria dos casos
   try {
     return JSON.parse(rawText);
   } catch {
     console.warn('[StudyOS AI] Parse direto falhou, limpando...');
   }
 
-  // Fallback: limpar e tentar novamente
-  const cleaned = rawText
-    .replace(/```json\s*/gi, '')
-    .replace(/```\s*/g, '')
-    .trim();
-
+  const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error('[StudyOS AI] Sem JSON na resposta:', rawText.substring(0, 500));
-    throw new Error('A IA não retornou formato válido. Tente novamente.');
+    console.error('[StudyOS AI] Sem JSON:', rawText.substring(0, 500));
+    throw new Error('IA não retornou formato válido. Tente novamente.');
   }
 
   try {
@@ -326,14 +757,13 @@ function parseAIResponse(rawText: string): any {
         .replace(/[\x00-\x1F\x7F]/g, ' ');
       return JSON.parse(repaired);
     } catch {
-      console.error('[StudyOS AI] Parse falhou:', jsonMatch[0].substring(0, 500));
       throw new Error('Falha ao interpretar resposta. Tente novamente.');
     }
   }
 }
 
 // ─────────────────────────────────────────────────────
-// NORMALIZAÇÃO
+// NORMALIZAÇÃO (single-pass)
 // ─────────────────────────────────────────────────────
 
 function normalizeGraphData(parsed: any): GenerateGraphResult {
@@ -376,12 +806,7 @@ function normalizeGraphData(parsed: any): GenerateGraphResult {
     : [];
 
   console.log(`[StudyOS AI] ✓ Grafo: ${concepts.length} conceitos, ${edges.length} dependências`);
-
-  return {
-    subjectName: parsed.subject_name || '',
-    concepts,
-    edges,
-  };
+  return { subjectName: parsed.subject_name || '', concepts, edges };
 }
 
 // ─────────────────────────────────────────────────────

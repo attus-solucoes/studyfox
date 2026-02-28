@@ -20,14 +20,20 @@ export const OPENAI_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
 // ─── Configuração da API ────────────────────────────
 export const API_CONFIG = {
-  maxOutputTokens: 8192,
+  maxOutputTokens: 16384,      // gpt-4o-mini suporta até 16K output
+  chapterOutputTokens: 12000,  // Por capítulo no multi-pass
+  structureOutputTokens: 4096, // Para extração de estrutura
   temperature: 0.7,
   topP: 0.95,
 
   // Limites de input
-  maxInputChars: 15000,
+  maxInputChars: 50000,        // Aumentado para textos maiores
   minInputChars: 80,
-  maxFileSizeMB: 10,       // Max pra upload de PDF
+  maxFileSizeMB: 20,           // PDFs acadêmicos podem ser grandes
+
+  // Threshold para multi-pass (PDFs grandes)
+  multiPassThresholdPages: 15, // PDFs com +15 páginas usam multi-pass
+  multiPassThresholdChars: 20000, // Textos com +20K chars usam multi-pass
 
   // Tipos aceitos
   supportedMimeTypes: [

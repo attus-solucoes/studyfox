@@ -5,7 +5,7 @@ import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'l
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
-import { generateGraph } from '@/lib/generateGraph';
+import { generateGraph, type ProgressInfo } from '@/lib/generateGraph';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -27,6 +27,7 @@ export default function CoursePage() {
   const [showUploadModal, setShowUploadModal] = useState<string | null>(null);
   const [subjectName, setSubjectName] = useState('');
   const [subjectSemester, setSubjectSemester] = useState('');
+  const [progress, setProgress] = useState<ProgressInfo | null>(null);
 
   if (!course) {
     return (
@@ -63,21 +64,26 @@ export default function CoursePage() {
     const subject = course.subjects.find(s => s.id === subjectId);
     setShowUploadModal(null);
     updateSubject(course.id, subjectId, { status: 'processing' });
+    setProgress({ step: 'Preparando análise...', current: 0, total: 1 });
     toast('🦊 IA analisando material...');
 
     try {
       // Validar input mínimo
       if (!file && textContent.trim().length < 80) {
         updateSubject(course.id, subjectId, { status: 'error' });
+        setProgress(null);
         toast.error('Conteúdo muito curto. Envie pelo menos 80 caracteres.');
         return;
       }
 
-      // Gerar grafo — PDF vai direto para o Gemini (multimodal!)
-      const { concepts, edges, subjectName: detectedName } = await generateGraph({
-        file: file || undefined,
-        text: file ? undefined : textContent,
-      });
+      // Gerar grafo com callback de progresso
+      const { concepts, edges, subjectName: detectedName } = await generateGraph(
+        {
+          file: file || undefined,
+          text: file ? undefined : textContent,
+        },
+        (info) => setProgress(info)
+      );
 
       updateSubject(course.id, subjectId, {
         status: 'ready',
@@ -86,10 +92,12 @@ export default function CoursePage() {
         name: detectedName || subject?.name || '',
         progress: 0,
       });
+      setProgress(null);
       toast.success(`✓ Grafo criado: ${concepts.length} conceitos mapeados!`);
     } catch (err: any) {
       console.error('[StudyOS] Graph generation error:', err);
       updateSubject(course.id, subjectId, { status: 'error' });
+      setProgress(null);
       toast.error(err?.message || '✗ Erro ao processar. Tente novamente.');
     }
   };
@@ -177,10 +185,29 @@ export default function CoursePage() {
                         </button>
                       )}
                       {s.status === 'processing' && (
-                        <p className="font-body text-[13px] text-muted">
-                          <Loader2 size={12} className="inline mr-1 animate-spin" />
-                          IA gerando grafo...
-                        </p>
+                        <div>
+                          <p className="font-body text-[13px] text-ink font-semibold flex items-center gap-1.5">
+                            <Loader2 size={12} className="animate-spin text-lime" />
+                            {progress?.step || 'IA gerando grafo...'}
+                          </p>
+                          {progress && progress.total > 1 && (
+                            <div className="mt-2">
+                              <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
+                                <motion.div
+                                  className="h-full bg-lime rounded-full"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
+                                  transition={{ duration: 0.5 }}
+                                />
+                              </div>
+                              <p className="font-body text-[11px] text-muted mt-1">
+                                {progress.detail && <span className="text-ink">{progress.detail}</span>}
+                                {progress.detail && ' · '}
+                                Passo {progress.current}/{progress.total}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {s.status === 'error' && (
                         <div>
@@ -338,7 +365,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (fi
               <div className="flex flex-col items-center gap-2">
                 <Upload size={32} className="text-muted" />
                 <p className="font-body font-semibold text-sm text-ink">Arraste seu PDF ou clique para selecionar</p>
-                <p className="font-body text-[11px] text-muted">PDF, TXT, DOC, DOCX — até 10MB</p>
+                <p className="font-body text-[11px] text-muted">PDF, TXT, DOC, DOCX — até 20MB</p>
               </div>
             )}
           </div>
