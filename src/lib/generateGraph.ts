@@ -290,7 +290,7 @@ async function multiPassPDF(
   const dataUrl = await fileToBase64DataUrl(file);
 
   // ═══ PASS 1: Extrair estrutura ═══
-  onProgress?.({ step: 'Analisando estrutura do material...', current: 1, total: 4, detail: 'Identificando capítulos e tópicos' });
+  onProgress?.({ step: 'Identificando estrutura e capítulos...', current: 1, total: 4, detail: 'Analisando organização do material' });
   console.log('[StudyOS AI] Pass 1: Extraindo estrutura...');
 
   const structureMessages: any[] = [
@@ -323,7 +323,7 @@ async function multiPassPDF(
   for (let i = 0; i < chapters.length; i++) {
     const chapter = chapters[i];
     onProgress?.({
-      step: `Processando capítulo ${i + 1} de ${chapters.length}`,
+      step: `Extraindo conceitos — capítulo ${i + 1} de ${chapters.length}...`,
       current: i + 2,
       total: totalSteps,
       detail: chapter.title,
@@ -374,7 +374,7 @@ async function multiPassPDF(
 
   // ═══ PASS 3: Conexões entre capítulos ═══
   onProgress?.({
-    step: 'Conectando conceitos entre capítulos...',
+    step: 'Mapeando dependências entre conceitos...',
     current: chapters.length + 2,
     total: totalSteps,
     detail: `${allConcepts.length} conceitos encontrados`,
@@ -407,7 +407,7 @@ async function multiPassPDF(
 
   // ═══ PASS 4: Assembly ═══
   onProgress?.({
-    step: 'Montando grafo final...',
+    step: 'Finalizando grafo...',
     current: totalSteps,
     total: totalSteps,
     detail: `${allConcepts.length} conceitos, ${allInternalEdges.length + crossEdges.length} conexões`,
@@ -511,7 +511,7 @@ async function singlePassPDF(
 ): Promise<GenerateGraphResult> {
   const dataUrl = await fileToBase64DataUrl(file);
 
-  onProgress?.({ step: 'Analisando material...', current: 1, total: 2, detail: file.name });
+  onProgress?.({ step: 'Lendo o material...', current: 1, total: 2, detail: file.name });
   console.log(`[StudyOS AI] Single pass: ${file.name} (${MODELS.graphGeneration})`);
 
   const messages: any[] = [
@@ -526,7 +526,7 @@ async function singlePassPDF(
   ];
 
   const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
-  onProgress?.({ step: 'Montando grafo...', current: 2, total: 2 });
+  onProgress?.({ step: 'Finalizando grafo...', current: 2, total: 2 });
   return normalizeGraphData(parsed);
 }
 
@@ -550,7 +550,7 @@ async function generateGraphFromText(
     return multiPassText(processedText, onProgress);
   }
 
-  onProgress?.({ step: 'Analisando material...', current: 1, total: 2, detail: `${processedText.length} caracteres` });
+  onProgress?.({ step: 'Lendo o material...', current: 1, total: 2, detail: `${processedText.length} caracteres` });
   console.log(`[StudyOS AI] Single pass texto: ${processedText.length} chars`);
 
   const messages = [
@@ -562,7 +562,7 @@ async function generateGraphFromText(
   ];
 
   const parsed = await callOpenAI(messages, API_CONFIG.maxOutputTokens);
-  onProgress?.({ step: 'Montando grafo...', current: 2, total: 2 });
+  onProgress?.({ step: 'Finalizando grafo...', current: 2, total: 2 });
   return normalizeGraphData(parsed);
 }
 
@@ -575,7 +575,7 @@ async function multiPassText(
   onProgress?: ProgressCallback
 ): Promise<GenerateGraphResult> {
   // Pass 1: Extrair estrutura
-  onProgress?.({ step: 'Analisando estrutura do material...', current: 1, total: 4, detail: 'Identificando seções' });
+  onProgress?.({ step: 'Identificando estrutura e capítulos...', current: 1, total: 4, detail: 'Analisando organização do material' });
 
   const structureMessages = [
     { role: 'system', content: STRUCTURE_PROMPT },
@@ -610,7 +610,7 @@ async function multiPassText(
   for (let i = 0; i < chapters.length; i++) {
     const chapter = chapters[i];
     onProgress?.({
-      step: `Processando seção ${i + 1} de ${chapters.length}`,
+      step: `Extraindo conceitos — capítulo ${i + 1} de ${chapters.length}...`,
       current: i + 2,
       total: totalSteps,
       detail: chapter.title,
@@ -650,10 +650,10 @@ async function multiPassText(
 
   // Pass 3: Conexões
   onProgress?.({
-    step: 'Conectando conceitos...',
+    step: 'Mapeando dependências entre conceitos...',
     current: chapters.length + 2,
     total: totalSteps,
-    detail: `${allConcepts.length} conceitos`,
+    detail: `${allConcepts.length} conceitos encontrados`,
   });
 
   let crossEdges: any[] = [];
@@ -674,7 +674,7 @@ async function multiPassText(
   }
 
   // Assembly
-  onProgress?.({ step: 'Montando grafo final...', current: totalSteps, total: totalSteps });
+  onProgress?.({ step: 'Finalizando grafo...', current: totalSteps, total: totalSteps });
   return assembleMultiPassGraph(subjectName, allConcepts, allInternalEdges, crossEdges, chapters);
 }
 
