@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
@@ -10,17 +10,39 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
   const { login, signup } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSignup) {
-      signup(name, email, password);
-    } else {
-      login(email, password);
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      if (isSignup) {
+        const result = await signup(name, email, password);
+        if (result.error) {
+          setError(result.error);
+        } else {
+          setSuccess('Conta criada! Verifique seu e-mail para confirmar.');
+        }
+      } else {
+        const result = await login(email, password);
+        if (result.error) {
+          setError(result.error);
+        } else {
+          navigate('/home');
+        }
+      }
+    } catch {
+      setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
-    navigate('/home');
   };
 
   return (
@@ -66,6 +88,18 @@ export default function Login() {
             {isSignup ? 'Cadastrar' : 'Entrar'}
           </h2>
 
+          {error && (
+            <div className="mt-4 p-3 bg-ember/10 border border-ember/30 rounded-md">
+              <p className="font-body text-sm text-ember">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mt-4 p-3 bg-lime/10 border border-lime/30 rounded-md">
+              <p className="font-body text-sm text-ink">{success}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {isSignup && (
               <div>
@@ -103,6 +137,7 @@ export default function Login() {
                   className="w-full bg-white border-[1.5px] border-line rounded-md px-4 py-3 font-body text-sm text-ink placeholder:text-muted focus:border-ink focus:outline-none transition-fast pr-10"
                   placeholder="••••••••"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
@@ -116,8 +151,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full bg-ink text-lime font-display font-bold text-sm tracking-wide py-3 rounded-md hover:bg-graphite transition-fast"
+              disabled={loading}
+              className="w-full bg-ink text-lime font-display font-bold text-sm tracking-wide py-3 rounded-md hover:bg-graphite transition-fast disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {loading && <Loader2 size={16} className="animate-spin" />}
               {isSignup ? 'Criar conta →' : 'Entrar →'}
             </button>
           </form>
@@ -125,7 +162,7 @@ export default function Login() {
           <p className="mt-4 text-center font-body text-[13px] text-muted">
             {isSignup ? 'Já tem conta? ' : 'Sem conta? '}
             <button
-              onClick={() => setIsSignup(!isSignup)}
+              onClick={() => { setIsSignup(!isSignup); setError(''); setSuccess(''); }}
               className="text-ink underline hover:text-graphite transition-fast"
             >
               {isSignup ? 'Entrar' : 'Criar grátis'}
