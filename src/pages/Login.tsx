@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
@@ -10,39 +10,35 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login, signup } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
+    setErrorMsg('');
+    setIsLoading(true);
 
-    try {
-      if (isSignup) {
-        const result = await signup(name, email, password);
-        if (result.error) {
-          setError(result.error);
-        } else {
-          setSuccess('Conta criada! Verifique seu e-mail para confirmar.');
-        }
-      } else {
-        const result = await login(email, password);
-        if (result.error) {
-          setError(result.error);
-        } else {
-          navigate('/home');
-        }
-      }
-    } catch {
-      setError('Erro inesperado. Tente novamente.');
-    } finally {
-      setLoading(false);
+    const result = isSignup
+      ? await signup(name, email, password)
+      : await login(email, password);
+
+    setIsLoading(false);
+
+    if (result.error) {
+      const msg = result.error.includes('Invalid login credentials')
+        ? 'E-mail ou senha incorretos.'
+        : result.error.includes('User already registered')
+        ? 'Este e-mail já está cadastrado.'
+        : result.error.includes('Password should be at least')
+        ? 'A senha deve ter pelo menos 6 caracteres.'
+        : result.error;
+      setErrorMsg(msg);
+      return;
     }
+
+    navigate('/home');
   };
 
   return (
@@ -57,7 +53,7 @@ export default function Login() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-2xl">🦊</span>
-            <span className="font-display font-bold text-[32px] text-lime">StudyOS</span>
+            <span className="font-display font-bold text-[32px] text-lime">StudyFox</span>
           </div>
 
           <div className="mt-12">
@@ -70,7 +66,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="font-body text-xs text-graphite">247 estudantes ativos</p>
+        <p className="font-body text-xs text-graphite">Powered by StudyFox 🦊</p>
       </motion.div>
 
       {/* Right Panel */}
@@ -87,18 +83,6 @@ export default function Login() {
           <h2 className="font-display font-bold text-[28px] text-ink mt-1">
             {isSignup ? 'Cadastrar' : 'Entrar'}
           </h2>
-
-          {error && (
-            <div className="mt-4 p-3 bg-ember/10 border border-ember/30 rounded-md">
-              <p className="font-body text-sm text-ember">{error}</p>
-            </div>
-          )}
-
-          {success && (
-            <div className="mt-4 p-3 bg-lime/10 border border-lime/30 rounded-md">
-              <p className="font-body text-sm text-ink">{success}</p>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {isSignup && (
@@ -149,20 +133,23 @@ export default function Login() {
               </div>
             </div>
 
+            {errorMsg && (
+              <p className="font-body text-sm text-ember">{errorMsg}</p>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-ink text-lime font-display font-bold text-sm tracking-wide py-3 rounded-md hover:bg-graphite transition-fast disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="w-full bg-ink text-lime font-display font-bold text-sm tracking-wide py-3 rounded-md hover:bg-graphite transition-fast disabled:opacity-50"
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {isSignup ? 'Criar conta →' : 'Entrar →'}
+              {isLoading ? 'Aguarde...' : isSignup ? 'Criar conta →' : 'Entrar →'}
             </button>
           </form>
 
           <p className="mt-4 text-center font-body text-[13px] text-muted">
             {isSignup ? 'Já tem conta? ' : 'Sem conta? '}
             <button
-              onClick={() => { setIsSignup(!isSignup); setError(''); setSuccess(''); }}
+              onClick={() => { setIsSignup(!isSignup); setErrorMsg(''); }}
               className="text-ink underline hover:text-graphite transition-fast"
             >
               {isSignup ? 'Entrar' : 'Criar grátis'}

@@ -1,5 +1,9 @@
+// ═══════════════════════════════════════════════════════
+// STUDYFOX — AUTH COM SUPABASE REAL
+// ═══════════════════════════════════════════════════════
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
@@ -58,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signup = async (name: string, email: string, password: string): Promise<{ error?: string }> => {
     const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { full_name: name }, emailRedirectTo: window.location.origin },
+      email, password, options: { data: { full_name: name } },
     });
     if (error) return { error: error.message };
     return {};
