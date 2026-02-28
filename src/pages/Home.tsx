@@ -1,13 +1,15 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X } from 'lucide-react';
+import { X, Brain, BookOpen, Target } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { Course } from '@/types/course';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
+
+const metricIcons = [Brain, BookOpen, Target];
 
 export default function Home() {
   const { user } = useAuth();
@@ -72,15 +74,25 @@ export default function Home() {
         </motion.div>
 
         {/* Metrics */}
-        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-          {metrics.map(m => (
-            <div key={m.label} className="bg-white border border-line rounded-lg p-5">
-              <p className="font-display font-extrabold text-[40px] text-ink leading-none">{m.value}</p>
-              <p className="font-body text-[11px] text-muted uppercase tracking-wide mt-1">{m.label}</p>
-              <p className={`font-body text-xs mt-1 ${m.positive ? 'text-lime' : 'text-muted'}`}>{m.delta}</p>
-            </div>
-          ))}
-        </motion.div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
+          {metrics.map((m, i) => {
+            const Icon = metricIcons[i];
+            return (
+              <motion.div
+                key={m.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.08 }}
+                className="bg-white border border-line rounded-lg p-5 relative hover:border-ink/20 transition-all duration-[120ms]"
+              >
+                <Icon size={16} className="absolute top-4 right-4 text-muted/40" strokeWidth={1.5} />
+                <p className="font-display font-extrabold text-[48px] text-ink leading-none">{m.value}</p>
+                <p className="font-body text-[11px] text-muted uppercase tracking-wide mt-1">{m.label}</p>
+                <p className={`font-body text-xs mt-1 ${m.positive ? 'text-[#BFFF00]' : 'text-muted'}`}>{m.delta}</p>
+              </motion.div>
+            );
+          })}
+        </div>
 
         {/* Courses */}
         <motion.div variants={item} className="mt-8">
@@ -88,38 +100,52 @@ export default function Home() {
 
           {courses.length === 0 ? (
             <div className="bg-white border-2 border-dashed border-line rounded-lg p-10 text-center mt-3">
-              <p className="text-4xl mb-4">🦊</p>
+              <motion.p
+                className="text-4xl mb-4"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                🦊
+              </motion.p>
               <p className="font-display font-bold text-xl text-ink">Comece sua jornada.</p>
               <p className="font-body text-sm text-muted mb-6 max-w-sm mx-auto">
                 Crie seu primeiro curso, adicione uma matéria e cole o conteúdo da apostila. A IA gera o grafo de conceitos pra você.
               </p>
               <button
                 onClick={() => setShowModal(true)}
-                className="bg-lime text-ink font-display font-bold text-[14px] tracking-wide px-8 py-3 rounded-md hover:brightness-95 transition-all duration-[120ms]"
+                className="bg-lime text-ink font-display font-bold text-[14px] tracking-wide px-8 py-3 rounded-md hover:brightness-95 transition-all duration-[120ms] shadow-[0_0_20px_rgba(191,255,0,0.3)]"
               >
                 Criar primeiro curso →
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              {courses.map(c => {
+              {courses.map((c, ci) => {
                 const totalNodes = c.subjects.reduce((a, s) => a + s.nodes.length, 0);
                 const avgProgress = c.subjects.length
                   ? Math.round(c.subjects.reduce((a, s) => a + s.progress, 0) / c.subjects.length)
                   : 0;
                 return (
-                  <div
+                  <motion.div
                     key={c.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: ci * 0.06 }}
                     onClick={() => navigate(`/course/${c.id}`)}
-                    className="bg-white border border-line rounded-lg p-5 cursor-pointer hover:border-ink transition-all duration-150"
+                    className="bg-white border border-line rounded-lg p-5 cursor-pointer hover:border-ink/20 hover:-translate-y-px hover:shadow-sm transition-all duration-[120ms] group"
                   >
                     <div className="flex items-center justify-between mb-0.5">
                       <p className="font-body font-semibold text-[15px] text-ink">{c.name}</p>
                       <div className="flex items-center gap-2">
                         {totalNodes > 0 && (
-                          <span className="font-mono text-[10px] text-lime bg-ink px-2 py-0.5 rounded">
+                          <motion.span
+                            className="font-mono text-[10px] text-lime bg-ink px-2 py-0.5 rounded"
+                            initial={{ scale: 1 }}
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 0.4, delay: ci * 0.06 + 0.3 }}
+                          >
                             {totalNodes} conceitos
-                          </span>
+                          </motion.span>
                         )}
                         <span className="font-body text-[10px] text-muted border border-line px-2 py-0.5 rounded">
                           {c.subjects.length} matéria{c.subjects.length !== 1 ? 's' : ''}
@@ -141,20 +167,20 @@ export default function Home() {
                         )}
                       </div>
                     )}
-                    <div className="w-full h-0.5 bg-line mt-3 rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-line mt-3 rounded-full overflow-hidden">
                       <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${avgProgress}%` }} />
                     </div>
-                    <p className="font-body text-[13px] text-muted hover:text-ink transition-fast mt-3">
-                      Ver matérias →
+                    <p className="font-body text-[13px] text-muted hover:text-ink transition-fast mt-3 inline-flex items-center gap-1">
+                      Ver matérias <span className="inline-block transition-transform duration-[120ms] group-hover:translate-x-1">→</span>
                     </p>
-                  </div>
+                  </motion.div>
                 );
               })}
 
               {/* Add course card */}
               <div
                 onClick={() => setShowModal(true)}
-                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex items-center justify-center hover:border-ink hover:text-ink transition-fast cursor-pointer text-muted"
+                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex items-center justify-center hover:border-ink/20 hover:text-ink transition-all duration-[120ms] cursor-pointer text-muted"
               >
                 <span className="font-body text-sm">+ Novo curso</span>
               </div>
@@ -171,15 +197,15 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.2 }}
           >
             <div className="absolute inset-0 bg-ink/60" onClick={() => setShowModal(false)} />
             <motion.div
               className="relative bg-white border border-line rounded-lg p-6 w-full max-w-md shadow-lg z-10"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              initial={{ scale: 0.95, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 8 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             >
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-display font-bold text-xl text-ink">Novo curso</h2>
@@ -208,7 +234,7 @@ export default function Home() {
               <button
                 onClick={handleCreate}
                 disabled={!courseName.trim()}
-                className="bg-ink text-lime font-display font-bold text-[13px] tracking-wide w-full py-3 rounded-md hover:bg-graphite transition-all duration-[120ms] disabled:opacity-40"
+                className="bg-ink text-lime font-display font-bold text-[13px] tracking-wide w-full py-3 rounded-md hover:bg-graphite transition-all duration-[120ms] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Criar curso →
               </button>
