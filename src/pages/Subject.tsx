@@ -100,6 +100,7 @@ function ConceptNode({ data }: NodeProps) {
         !unlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
       }`}
       style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
+      title={node.title}
     >
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-0 !h-0" />
 
@@ -142,10 +143,11 @@ function ConceptNode({ data }: NodeProps) {
 
         {/* Inner circle */}
         <div
-          className="w-[96px] h-[96px] rounded-full flex items-center justify-center bg-card border border-border z-10"
+          className="w-[104px] h-[104px] rounded-full flex items-center justify-center bg-card border border-border z-10"
         >
           <span
-            className="font-body text-[11px] font-semibold text-center leading-tight px-2 text-foreground line-clamp-2"
+            className="font-body text-[11px] font-semibold text-center leading-tight text-foreground line-clamp-3"
+            style={{ wordBreak: 'break-word', padding: '8px', maxWidth: '100px' }}
           >
             {node.title}
           </span>

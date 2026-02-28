@@ -13,8 +13,11 @@ interface FormulaCalculatorProps {
  * em expressão avaliável pelo mathjs, isolando a incógnita.
  */
 function parseFormula(formula: string): { lhs: string; rhs: string } | null {
+  // Remove textos explicativos como "(onde Q é calor...)"
+  let clean = formula.replace(/\(onde[^)]*\)/gi, '');
+
   // Limpa LaTeX superficial
-  let clean = formula
+  clean = clean
     .replace(/\\cdot/g, '*')
     .replace(/\\times/g, '*')
     .replace(/\\div/g, '/')
@@ -69,14 +72,38 @@ export default function FormulaCalculator({ formula, variables }: FormulaCalcula
     try {
       const { lhs, rhs } = parsed;
 
+      // Collect all variable symbols (sorted longest-first to avoid partial replacement)
+      const allSymbols = variables.map((v) => v.symbol).sort((a, b) => b.length - a.length);
+      const shortNames: Record<string, string> = {};
+      allSymbols.forEach((sym, i) => {
+        shortNames[sym] = String.fromCharCode(97 + i); // a, b, c, ...
+      });
+
+      // Build short scope (excluding unknown)
+      const shortScope: Record<string, number> = {};
+      for (const [sym, val] of Object.entries(scope)) {
+        shortScope[shortNames[sym]] = val;
+      }
+
+      // Replace variable names in expression (longest first)
+      const replaceVars = (expr: string) => {
+        let result = expr;
+        for (const [long, short] of Object.entries(shortNames)) {
+          result = result.split(long).join(short);
+        }
+        return result;
+      };
+
+      const shortLhs = replaceVars(lhs);
+      const shortRhs = replaceVars(rhs);
+      const shortUnknown = shortNames[unknown];
+
       // Se a incógnita está no lhs, avaliar rhs
-      if (lhs.includes(unknown)) {
-        // Tentar avaliar rhs diretamente
-        const res = evaluate(rhs, scope);
+      if (shortLhs.includes(shortUnknown)) {
+        const res = evaluate(shortRhs, shortScope);
         setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
       } else {
-        // Incógnita está no rhs — avaliar lhs
-        const res = evaluate(lhs, scope);
+        const res = evaluate(shortLhs, shortScope);
         setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
       }
     } catch (e: any) {
