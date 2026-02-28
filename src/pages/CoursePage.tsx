@@ -5,8 +5,7 @@ import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText } from 'l
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
-import { extractTextFromFile, extractTextFromString } from '@/lib/extractText';
-import { generateGraphFromText } from '@/lib/generateGraph';
+import { generateGraph } from '@/lib/generateGraph';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -64,20 +63,22 @@ export default function CoursePage() {
     const subject = course.subjects.find(s => s.id === subjectId);
     setShowUploadModal(null);
     updateSubject(course.id, subjectId, { status: 'processing' });
-    toast('🦊 Gerando grafo...');
+    toast('🦊 IA analisando material...');
 
     try {
-      const text = file
-        ? await extractTextFromFile(file)
-        : extractTextFromString(textContent);
-
-      if (text.length < 100) {
+      // Validar input mínimo
+      if (!file && textContent.trim().length < 80) {
         updateSubject(course.id, subjectId, { status: 'error' });
-        toast.error('Conteúdo muito curto. Envie pelo menos 100 caracteres.');
+        toast.error('Conteúdo muito curto. Envie pelo menos 80 caracteres.');
         return;
       }
 
-      const { concepts, edges, subjectName: detectedName } = await generateGraphFromText(text);
+      // Gerar grafo — PDF vai direto para o Gemini (multimodal!)
+      const { concepts, edges, subjectName: detectedName } = await generateGraph({
+        file: file || undefined,
+        text: file ? undefined : textContent,
+      });
+
       updateSubject(course.id, subjectId, {
         status: 'ready',
         nodes: concepts,
@@ -85,11 +86,11 @@ export default function CoursePage() {
         name: detectedName || subject?.name || '',
         progress: 0,
       });
-      toast.success('✓ Grafo criado com sucesso!');
-    } catch (err) {
-      console.error('Graph generation error:', err);
+      toast.success(`✓ Grafo criado: ${concepts.length} conceitos mapeados!`);
+    } catch (err: any) {
+      console.error('[StudyOS] Graph generation error:', err);
       updateSubject(course.id, subjectId, { status: 'error' });
-      toast.error('✗ Erro ao processar. Tente novamente.');
+      toast.error(err?.message || '✗ Erro ao processar. Tente novamente.');
     }
   };
 
