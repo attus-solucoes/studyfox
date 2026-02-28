@@ -1,18 +1,45 @@
 
 
-## Plan: Disable Email Confirmation on Supabase
+## Plan: Move OpenAI API calls to Supabase Edge Function
 
-The goal is to allow users to sign up and immediately access the platform without email verification.
+Currently, `generateGraph.ts` and `generateExercises.ts` call the OpenAI API directly from the frontend using `VITE_OPENAI_API_KEY` (exposed in browser). The user chose the secure Edge Function approach.
 
-### Step 1: Disable email confirmation in Supabase Auth settings
+### Step 1: Add OpenAI API key as Supabase secret
 
-Go to the Supabase Dashboard → Authentication → Providers → Email and **disable "Confirm email"**. This is a dashboard setting, not a code change.
+Use the secrets tool to ask the user for their `OPENAI_API_KEY`. This will be stored securely in Supabase and accessible only from Edge Functions.
 
-**URL:** https://supabase.com/dashboard/project/jwryenhnthmxzlztiamt/auth/providers
+### Step 2: Create Edge Function `supabase/functions/openai-proxy/index.ts`
 
-### Step 2: Update Login.tsx
+A single proxy function that:
+- Accepts `{ messages, max_tokens, temperature, model }` from the frontend
+- Reads `OPENAI_API_KEY` from `Deno.env`
+- Forwards the request to `https://api.openai.com/v1/chat/completions`
+- Returns the response (with proper CORS headers)
+- Handles 429/401/400 errors and returns meaningful messages
 
-After signup succeeds, navigate directly to `/home` (already does this). Remove any "check your email" messaging if present in the current code. The `onAuthStateChange` listener in AuthContext will pick up the session automatically since Supabase will return a session immediately on signup when email confirmation is disabled.
+Update `supabase/config.toml` to add `[functions.openai-proxy]` with `verify_jwt = false`.
 
-No database migrations needed. No edge functions needed.
+### Step 3: Update `src/lib/gemini.ts`
+
+- Remove `OPENAI_API_KEY` and `OPENAI_BASE_URL` exports
+- Replace `rateLimitedFetch` with a function that calls the Edge Function via `supabase.functions.invoke('openai-proxy', { body: ... })`
+- Keep `API_CONFIG`, `validateFile`, `fileToBase64DataUrl` unchanged
+
+### Step 4: Update `src/lib/generateGraph.ts`
+
+- Remove imports of `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `rateLimitedFetch`
+- Update `callOpenAI()` to call the edge function instead of direct OpenAI fetch
+- Remove the `OPENAI_API_KEY` check at the top of `generateGraph()`
+
+### Step 5: Update `src/lib/generateExercises.ts`
+
+- Same pattern: replace direct OpenAI fetch with edge function call
+- Remove `OPENAI_API_KEY` check
+
+### Files changed
+- `supabase/functions/openai-proxy/index.ts` (new)
+- `supabase/config.toml` (add function config)
+- `src/lib/gemini.ts` (remove API key, add edge function caller)
+- `src/lib/generateGraph.ts` (use new caller)
+- `src/lib/generateExercises.ts` (use new caller)
 
