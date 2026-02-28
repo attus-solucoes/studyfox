@@ -65,7 +65,7 @@ export default function Config() {
               <p className="font-body text-[12px] text-muted">Usado para gerar grafos e exercícios</p>
             </div>
             <span className="font-mono text-[12px] text-muted bg-paper border border-line px-2.5 py-1 rounded">
-              gemini-2.0-flash
+              gpt-4o-mini
             </span>
           </div>
         </div>
