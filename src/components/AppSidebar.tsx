@@ -20,8 +20,9 @@ export default function AppSidebar() {
 
   // Flatten all subjects from all courses for sidebar
   const allSubjects = courses.flatMap(c =>
-    c.subjects.filter(s => s.status === 'ready').map(s => ({ id: s.id, name: s.name }))
+    c.subjects.filter(s => s.status === 'ready').map(s => ({ id: s.id, name: s.name, progress: s.progress ?? 0 }))
   );
+  const weeklyProgress = 68;
 
   const sidebar = (
     <aside className={`
@@ -31,9 +32,9 @@ export default function AppSidebar() {
     `}>
       {/* Logo */}
       <div className="px-4 pt-5 pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 group cursor-default">
           <span className="text-base">🦊</span>
-          <span className="font-display font-bold text-base text-lime">StudyOS</span>
+          <span className="font-display font-bold text-base text-lime transition-fast group-hover:brightness-110">StudyOS</span>
         </div>
         <span className="font-mono text-[10px] text-muted mt-0.5 block">v0.1 beta</span>
       </div>
@@ -59,18 +60,22 @@ export default function AppSidebar() {
                 className={`flex items-center gap-2.5 px-4 py-2 font-body text-[13px] transition-fast ${
                   active
                     ? 'text-lime border-l-2 border-lime bg-[#1A1A18]'
-                    : 'text-[#E8E4DC] border-l-2 border-transparent hover:bg-[#1A1A18]'
+                    : 'text-[#E8E4DC] border-l-2 border-transparent hover:border-lime/40 hover:bg-[#1A1A18]'
                 }`}
               >
-                <BookOpen size={14} />
-                {s.name}
+                <BookOpen size={14} className="shrink-0" />
+                <span className="flex-1 truncate">{s.name}</span>
+                <span className="font-mono text-[9px] text-muted shrink-0">{s.progress}%</span>
               </Link>
             );
           })
         )}
 
+        {/* Separator */}
+        <div className="mx-4 mt-4 mb-2 h-px" style={{ background: 'linear-gradient(to right, #BFFF00, transparent)' }} />
+
         {/* Navegar */}
-        <div className="px-4 pt-5 pb-1">
+        <div className="px-4 pt-2 pb-1">
           <span className="font-body text-[10px] text-muted uppercase tracking-widest">Navegar</span>
         </div>
         {navItems.map(item => {
@@ -83,7 +88,7 @@ export default function AppSidebar() {
               className={`flex items-center gap-2.5 px-4 py-2 font-body text-[13px] transition-fast ${
                 active
                   ? 'text-lime border-l-2 border-lime bg-[#1A1A18]'
-                  : 'text-[#E8E4DC] border-l-2 border-transparent hover:bg-[#1A1A18]'
+                  : 'text-[#E8E4DC] border-l-2 border-transparent hover:border-lime/40 hover:bg-[#1A1A18]'
               }`}
             >
               <item.icon size={14} />
@@ -96,7 +101,7 @@ export default function AppSidebar() {
       {/* Footer */}
       <div className="p-4 border-t border-[#1E1E1C]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-lime flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-full bg-lime flex items-center justify-center ${weeklyProgress > 50 ? 'ring-2 ring-lime ring-offset-2 ring-offset-ink' : ''}`}>
             <span className="font-display font-bold text-xs text-ink">
               {user?.initials || '🦊'}
             </span>
@@ -105,10 +110,10 @@ export default function AppSidebar() {
             <p className="font-body text-[13px] text-[#E8E4DC] truncate">
               {user?.name || 'Estudante'}
             </p>
-            <div className="w-full h-0.5 bg-[#1E1E1C] mt-1">
-              <div className="h-full bg-lime" style={{ width: '68%' }} />
+            <div className="w-full h-1 bg-[#1E1E1C] rounded-full mt-1">
+              <div className="h-full bg-lime rounded-full transition-all duration-300" style={{ width: `${weeklyProgress}%` }} />
             </div>
-            <p className="font-body text-[10px] text-muted mt-0.5">68% esta semana</p>
+            <p className={`font-body text-[10px] mt-0.5 ${weeklyProgress > 60 ? 'text-lime font-semibold' : 'text-muted'}`}>{weeklyProgress}% esta semana</p>
           </div>
         </div>
       </div>
