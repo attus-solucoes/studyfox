@@ -72,11 +72,11 @@ export default function FormulaCalculator({ formula, variables }: FormulaCalcula
     try {
       const { lhs, rhs } = parsed;
 
-      // Collect all variable symbols (sorted longest-first to avoid partial replacement)
+      // Sort symbols longest-first to avoid partial replacement
       const allSymbols = variables.map((v) => v.symbol).sort((a, b) => b.length - a.length);
       const shortNames: Record<string, string> = {};
       allSymbols.forEach((sym, i) => {
-        shortNames[sym] = String.fromCharCode(97 + i); // a, b, c, ...
+        shortNames[sym] = String.fromCharCode(97 + i);
       });
 
       // Build short scope (excluding unknown)
@@ -85,30 +85,58 @@ export default function FormulaCalculator({ formula, variables }: FormulaCalcula
         shortScope[shortNames[sym]] = val;
       }
 
-      // Replace variable names in expression (longest first)
-      const replaceVars = (expr: string) => {
-        let result = expr;
+      // Clean and replace variable names in expression
+      const cleanExpr = (expr: string) => {
+        let r = expr;
+        // Remove texto explicativo "(onde ...)"
+        r = r.replace(/\(onde[^)]*\)/gi, '');
+        r = r.replace(/onde\s+\S+[^,\n]*/gi, '');
+        // Replace longest symbols first
         for (const [long, short] of Object.entries(shortNames)) {
-          result = result.split(long).join(short);
+          r = r.split(long).join(short);
         }
-        return result;
+        return r.trim();
       };
 
-      const shortLhs = replaceVars(lhs);
-      const shortRhs = replaceVars(rhs);
+      const shortLhs = cleanExpr(lhs);
+      const shortRhs = cleanExpr(rhs);
       const shortUnknown = shortNames[unknown];
 
-      // Se a incógnita está no lhs, avaliar rhs
+      // Se a incógnita está no lhs, avaliar rhs e vice-versa
+      let exprToEval: string;
       if (shortLhs.includes(shortUnknown)) {
-        const res = evaluate(shortRhs, shortScope);
-        setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
+        exprToEval = shortRhs;
       } else {
-        const res = evaluate(shortLhs, shortScope);
-        setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
+        exprToEval = shortLhs;
       }
+
+      const res = evaluate(exprToEval, shortScope);
+      setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
     } catch (e: any) {
-      setError('Não foi possível calcular. Verifique a fórmula.');
-      console.warn('[FormulaCalculator]', e?.message);
+      // Fallback: tentar avaliar só o lado direito limpo
+      try {
+        const { rhs } = parsed;
+        let fallback = rhs
+          .replace(/\(onde[^)]*\)/gi, '')
+          .replace(/onde\s+\S+[^,\n]*/gi, '');
+        const allSymbols = variables.map((v) => v.symbol).sort((a, b) => b.length - a.length);
+        const shortNames: Record<string, string> = {};
+        allSymbols.forEach((sym, i) => {
+          shortNames[sym] = String.fromCharCode(97 + i);
+        });
+        for (const [long, short] of Object.entries(shortNames)) {
+          fallback = fallback.split(long).join(short);
+        }
+        const shortScope: Record<string, number> = {};
+        for (const [sym, val] of Object.entries(scope)) {
+          shortScope[shortNames[sym]] = val;
+        }
+        const res = evaluate(fallback.trim(), shortScope);
+        setResult(typeof res === 'number' ? Math.round(res * 10000) / 10000 : res);
+      } catch {
+        setError('Não foi possível calcular. Verifique a fórmula.');
+        console.warn('[FormulaCalculator]', e?.message);
+      }
     }
   };
 

@@ -56,7 +56,7 @@ export default function Concept() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [exerciseResult, setExerciseResult] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
-  const [showSolution, setShowSolution] = useState(false);
+  // showSolution removed — resolution always visible on wrong answer
   const [attempts, setAttempts] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [prevMastery, setPrevMastery] = useState<number | null>(null);
@@ -147,7 +147,6 @@ export default function Concept() {
     setAnswer('');
     setSelectedOption(null);
     setShowHint(false);
-    setShowSolution(false);
     setAttempts(1);
     setPrevMastery(null);
     if (currentExerciseIndex < exercises.length - 1) {
@@ -161,7 +160,6 @@ export default function Concept() {
     setExerciseResult(null);
     setAnswer('');
     setSelectedOption(null);
-    setShowSolution(false);
     setAttempts(a => a + 1);
   };
 
@@ -564,25 +562,16 @@ export default function Concept() {
 
                 {exerciseResult === 'wrong' && currentExercise && (
                   <motion.div key="wrong" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-ember rounded-lg p-5">
-                    <p className="font-display font-bold text-xl text-white mb-2">✗ Não desta vez.</p>
-                    <button onClick={() => setShowSolution(!showSolution)} className="font-body text-[13px] text-white/80 underline mb-2">
-                      {showSolution ? 'Esconder' : 'Ver'} resolução completa
-                    </button>
-                    <AnimatePresence>
-                      {showSolution && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                          <div className="bg-white/10 rounded p-3 mt-1 mb-2">
-                            <div className="text-white/90"><ResolutionText text={currentExercise.solution} /></div>
-                            <p className="font-body text-[12px] text-white/70 mt-2">
-                              Resposta correta: <span className="font-semibold text-white">{currentExercise.answer}</span>
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    <div className="flex gap-2 mt-3">
+                    <p className="font-display font-bold text-xl text-white mb-2">✗ Não desta vez — mas veja como se resolve:</p>
+                    <div className="bg-white/10 rounded p-3 mt-1 mb-3">
+                      <div className="text-white/90"><ResolutionText text={currentExercise.solution} /></div>
+                      <p className="font-body text-[12px] text-white/70 mt-2">
+                        Resposta correta: <span className="font-semibold text-white">{currentExercise.answer}</span>
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
                       <button onClick={retry} className="flex-1 font-body text-[13px] text-white border border-white/30 py-2 rounded-md hover:bg-white/10 transition-colors">Tentar de novo</button>
-                      <button onClick={nextExercise} className="flex-1 font-body text-[13px] text-white border border-white/30 py-2 rounded-md hover:bg-white/10 transition-colors">Próximo →</button>
+                      <button onClick={nextExercise} className="flex-1 font-body text-[13px] text-white border border-white/30 py-2 rounded-md hover:bg-white/10 transition-colors">Próximo exercício →</button>
                     </div>
                   </motion.div>
                 )}
