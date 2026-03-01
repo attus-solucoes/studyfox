@@ -6,8 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 // ─── Modelos OpenAI ─────────────────────────────────
 export const MODELS = {
-  graphGeneration: 'gpt-4o-mini',
+  graphGeneration: 'gpt-4o',
+  chapterExtraction: 'gpt-4o',
   exerciseGeneration: 'gpt-4o-mini',
+  chat: 'gpt-4o-mini',
 } as const;
 
 // ─── Configuração da API ────────────────────────────
