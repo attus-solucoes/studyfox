@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Brain, BookOpen, Target, Zap } from 'lucide-react';
-import { useState, useMemo } from 'react';
-import type { Course } from '@/types/course';
+import { X, Brain, BookOpen, Target, Zap, GraduationCap } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import type { Course, Subject } from '@/types/course';
+import { findCurriculumMatch, type CurriculaTemplate } from '@/lib/curricula';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -18,6 +19,20 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [courseName, setCourseName] = useState('');
   const [courseInstitution, setCourseInstitution] = useState('');
+  const [matchedTemplate, setMatchedTemplate] = useState<CurriculaTemplate | null>(null);
+  const [useTemplate, setUseTemplate] = useState<boolean | null>(null);
+
+  // Detect template match when name/institution changes
+  useEffect(() => {
+    if (courseName.trim().length >= 3 && courseInstitution.trim().length >= 3) {
+      const match = findCurriculumMatch(courseName, courseInstitution);
+      setMatchedTemplate(match);
+      if (!match) setUseTemplate(null);
+    } else {
+      setMatchedTemplate(null);
+      setUseTemplate(null);
+    }
+  }, [courseName, courseInstitution]);
 
   const globalStats = useMemo(() => {
     let totalConcepts = 0;
@@ -54,16 +69,43 @@ export default function Home() {
   const handleCreate = () => {
     if (!courseName.trim()) return;
     const id = crypto.randomUUID();
+
+    // Build subjects from template if accepted
+    let subjects: Subject[] = [];
+    if (useTemplate && matchedTemplate) {
+      const currentYear = new Date().getFullYear();
+      subjects = matchedTemplate.semesters.flatMap((sem) => {
+        // Assign semesters as "year.half" starting from a base
+        const yearOffset = Math.floor((sem.number - 1) / 2);
+        const half = ((sem.number - 1) % 2) + 1;
+        const semesterKey = `${currentYear - 5 + yearOffset}.${half}`;
+
+        return sem.subjects.map((st) => ({
+          id: crypto.randomUUID(),
+          courseId: id,
+          name: st.name,
+          semester: semesterKey,
+          status: 'empty' as const,
+          progress: 0,
+          nodes: [],
+          edges: [],
+          createdAt: new Date().toISOString(),
+        }));
+      });
+    }
+
     const newCourse: Course = {
       id,
       name: courseName.trim(),
       institution: courseInstitution.trim(),
       createdAt: new Date().toISOString(),
-      subjects: [],
+      subjects,
     };
     addCourse(newCourse);
     setCourseName('');
     setCourseInstitution('');
+    setMatchedTemplate(null);
+    setUseTemplate(null);
     setShowModal(false);
     navigate(`/course/${id}`);
   };
@@ -285,9 +327,63 @@ export default function Home() {
               <input
                 value={courseInstitution}
                 onChange={e => setCourseInstitution(e.target.value)}
-                placeholder="Ex: UFSC"
-                className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-6"
+                placeholder="Ex: UNIFEI"
+                className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-4"
               />
+
+              {/* Template detection */}
+              <AnimatePresence>
+                {matchedTemplate && useTemplate === null && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden mb-4"
+                  >
+                    <div className="bg-lime/10 border border-lime/30 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <GraduationCap size={20} className="text-ink shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-body font-semibold text-sm text-ink">
+                            Grade de {matchedTemplate.name} — {matchedTemplate.institution}
+                          </p>
+                          <p className="font-body text-xs text-muted mt-1">
+                            {matchedTemplate.semesters.length} semestres · {matchedTemplate.semesters.reduce((a, s) => a + s.subjects.length, 0)} matérias pré-cadastradas
+                          </p>
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => setUseTemplate(true)}
+                              className="bg-ink text-lime font-display font-bold text-[11px] tracking-wide px-4 py-2 rounded-md hover:bg-graphite transition-all duration-[120ms]"
+                            >
+                              Usar grade ✓
+                            </button>
+                            <button
+                              onClick={() => setUseTemplate(false)}
+                              className="border border-line font-body text-[11px] text-muted px-4 py-2 rounded-md hover:border-ink hover:text-ink transition-all duration-[120ms]"
+                            >
+                              Configurar manualmente
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {useTemplate && matchedTemplate && (
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="font-body text-[11px] text-lime bg-ink px-2.5 py-1 rounded">
+                    ✓ Grade {matchedTemplate.institution} será aplicada
+                  </span>
+                  <button
+                    onClick={() => setUseTemplate(null)}
+                    className="font-body text-[10px] text-muted hover:text-ink"
+                  >
+                    Alterar
+                  </button>
+                </div>
+              )}
 
               <button
                 onClick={handleCreate}
