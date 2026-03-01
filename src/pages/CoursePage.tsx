@@ -252,95 +252,147 @@ export default function CoursePage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              {course.subjects.map(s => {
-                const sc = statusConfig[s.status];
+            <div className="space-y-5 mt-3">
+              {semesterGroups.map((group) => {
+                const isCollapsed = group.isPast && collapsedSemesters[group.key] !== false;
+                const isManuallyCollapsed = !group.isPast && collapsedSemesters[group.key] === true;
+                const collapsed = isCollapsed || isManuallyCollapsed;
+
                 return (
-                  <div key={s.id} className={`bg-white border rounded-lg p-5 transition-all duration-[120ms] relative ${s.status === 'ready' ? 'border-line hover:border-lime/60 hover:shadow-sm' : 'border-line hover:border-ink/20'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-body font-semibold text-[15px] text-ink pr-6">{s.name}</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded-full ${sc.color}`}>
-                          {s.status === 'processing' && <Loader2 size={10} className="inline mr-1 animate-spin" />}
-                          {sc.label}
-                        </span>
-                        {/* Menu button */}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === s.id ? null : s.id); }}
-                            className="text-muted hover:text-ink transition-colors duration-[120ms] p-0.5 rounded"
-                          >
-                            <MoreVertical size={14} />
-                          </button>
-                          {menuOpen === s.id && (
-                            <SubjectMenu
-                              subject={s}
-                              onClose={() => setMenuOpen(null)}
-                              onEdit={() => {
-                                setEditSubject(s);
-                                setEditName(s.name);
-                                setEditSemester(s.semester || '');
-                                setMenuOpen(null);
-                              }}
-                              onViewRaw={() => { setViewRawText(s); setMenuOpen(null); }}
-                              onRetrain={() => { setConfirmRetrain(s); setMenuOpen(null); }}
-                              onDelete={() => { setConfirmDelete(s); setMenuOpen(null); }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {s.semester && <p className="font-body text-xs text-muted">{s.semester}</p>}
-                      {s.status === 'ready' && s.nodes.length > 0 && (
-                        <span className="font-body text-[10px] text-muted">· {s.nodes.length} conceito{s.nodes.length !== 1 ? 's' : ''}</span>
-                      )}
-                    </div>
-                    <div className="w-full h-1 bg-line mt-3 rounded-full overflow-hidden">
-                      <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
-                    </div>
-                    <div className="mt-3">
-                      {s.status === 'ready' && (
-                        <button
-                          onClick={() => navigate(`/subject/${s.id}`)}
-                          className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] group"
+                  <div key={group.key}>
+                    {/* Semester header */}
+                    <button
+                      onClick={() => toggleCollapse(group.key)}
+                      className={`w-full flex items-center gap-2.5 py-2 px-3 rounded-lg transition-all duration-[120ms] mb-2 ${
+                        group.isActive
+                          ? 'border-l-[3px] border-l-lime bg-lime/5'
+                          : group.isPast
+                            ? 'opacity-70 hover:opacity-100'
+                            : ''
+                      }`}
+                    >
+                      <span className="text-base">
+                        {group.isActive ? '🎒' : group.isPast ? '✓' : '🔒'}
+                      </span>
+                      <span className={`font-display font-bold text-sm ${group.isPast ? 'text-muted' : 'text-ink'}`}>
+                        {group.label}
+                      </span>
+                      <span className="font-body text-[11px] text-muted ml-auto mr-1">
+                        {group.subjects.length} matéria{group.subjects.length !== 1 ? 's' : ''}
+                        {group.isPast && ' concluídas'}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={`text-muted transition-transform duration-150 ${collapsed ? '' : 'rotate-180'}`}
+                      />
+                    </button>
+
+                    {/* Subject cards */}
+                    <AnimatePresence initial={false}>
+                      {!collapsed && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
                         >
-                          Ver grafo <span className="inline-block transition-transform duration-[120ms] group-hover:translate-x-1">→</span>
-                        </button>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                            {group.subjects.map(s => {
+                              const sc = statusConfig[s.status];
+                              return (
+                                <div key={s.id} className={`bg-white border rounded-lg p-5 transition-all duration-[120ms] relative ${s.status === 'ready' ? 'border-line hover:border-lime/60 hover:shadow-sm' : 'border-line hover:border-ink/20'}`}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="font-body font-semibold text-[15px] text-ink pr-6">{s.name}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`font-body text-[10px] uppercase tracking-wide border px-2 py-0.5 rounded-full ${sc.color}`}>
+                                        {s.status === 'processing' && <Loader2 size={10} className="inline mr-1 animate-spin" />}
+                                        {sc.label}
+                                      </span>
+                                      <div className="relative">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === s.id ? null : s.id); }}
+                                          className="text-muted hover:text-ink transition-colors duration-[120ms] p-0.5 rounded"
+                                        >
+                                          <MoreVertical size={14} />
+                                        </button>
+                                        {menuOpen === s.id && (
+                                          <SubjectMenu
+                                            subject={s}
+                                            onClose={() => setMenuOpen(null)}
+                                            onEdit={() => {
+                                              setEditSubject(s);
+                                              setEditName(s.name);
+                                              setEditSemester(s.semester || '');
+                                              setMenuOpen(null);
+                                            }}
+                                            onViewRaw={() => { setViewRawText(s); setMenuOpen(null); }}
+                                            onRetrain={() => { setConfirmRetrain(s); setMenuOpen(null); }}
+                                            onDelete={() => { setConfirmDelete(s); setMenuOpen(null); }}
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {s.semester && <p className="font-body text-xs text-muted">{s.semester}</p>}
+                                    {s.status === 'ready' && s.nodes.length > 0 && (
+                                      <span className="font-body text-[10px] text-muted">· {s.nodes.length} conceito{s.nodes.length !== 1 ? 's' : ''}</span>
+                                    )}
+                                  </div>
+                                  <div className="w-full h-1 bg-line mt-3 rounded-full overflow-hidden">
+                                    <div className="h-full bg-lime rounded-full transition-all duration-500" style={{ width: `${s.progress}%` }} />
+                                  </div>
+                                  <div className="mt-3">
+                                    {s.status === 'ready' && (
+                                      <button
+                                        onClick={() => navigate(`/subject/${s.id}`)}
+                                        className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] group"
+                                      >
+                                        Ver grafo <span className="inline-block transition-transform duration-[120ms] group-hover:translate-x-1">→</span>
+                                      </button>
+                                    )}
+                                    {s.status === 'empty' && (
+                                      <button
+                                        onClick={() => setShowUploadModal(s.id)}
+                                        className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] flex items-center gap-1"
+                                      >
+                                        <Upload size={12} /> Adicionar apostila
+                                      </button>
+                                    )}
+                                    {s.status === 'processing' && (
+                                      <p className="font-body text-[13px] text-ink font-semibold flex items-center gap-1.5">
+                                        <Loader2 size={12} className="animate-spin text-lime" />
+                                        Processando com IA...
+                                      </p>
+                                    )}
+                                    {s.status === 'error' && (
+                                      <div>
+                                        <button
+                                          onClick={() => setShowUploadModal(s.id)}
+                                          className="font-body text-[13px] text-ember hover:text-ink transition-all duration-[120ms]"
+                                        >
+                                          Tentar novamente →
+                                        </button>
+                                        <p className="font-body text-[11px] text-muted mt-1">Erro técnico — veja console (F12)</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
                       )}
-                      {s.status === 'empty' && (
-                        <button
-                          onClick={() => setShowUploadModal(s.id)}
-                          className="font-body text-[13px] text-muted hover:text-ink transition-all duration-[120ms] flex items-center gap-1"
-                        >
-                          <Upload size={12} /> Adicionar apostila
-                        </button>
-                      )}
-                      {s.status === 'processing' && (
-                        <p className="font-body text-[13px] text-ink font-semibold flex items-center gap-1.5">
-                          <Loader2 size={12} className="animate-spin text-lime" />
-                          Processando com IA...
-                        </p>
-                      )}
-                      {s.status === 'error' && (
-                        <div>
-                          <button
-                            onClick={() => setShowUploadModal(s.id)}
-                            className="font-body text-[13px] text-ember hover:text-ink transition-all duration-[120ms]"
-                          >
-                            Tentar novamente →
-                          </button>
-                          <p className="font-body text-[11px] text-muted mt-1">Erro técnico — veja console (F12)</p>
-                        </div>
-                      )}
-                    </div>
+                    </AnimatePresence>
                   </div>
                 );
               })}
 
+              {/* Add subject card */}
               <div
                 onClick={() => setShowSubjectModal(true)}
-                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex flex-col items-center justify-center gap-1 hover:border-ink hover:text-ink transition-all duration-[150ms] cursor-pointer text-muted min-h-[120px]"
+                className="border-[1.5px] border-dashed border-line rounded-lg p-5 flex flex-col items-center justify-center gap-1 hover:border-ink hover:text-ink transition-all duration-[150ms] cursor-pointer text-muted min-h-[80px]"
               >
                 <Plus size={20} strokeWidth={1.5} />
                 <span className="font-body text-sm">Nova matéria</span>
