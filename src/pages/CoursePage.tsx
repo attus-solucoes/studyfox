@@ -1,15 +1,34 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText, MoreVertical, Pencil, FileSearch, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, Upload, X, Loader2, AlertCircle, CheckCircle2, FileText, MoreVertical, Pencil, FileSearch, RefreshCw, Trash2, ChevronDown } from 'lucide-react';
 import GraphGenerationOverlay from '@/components/GraphGenerationOverlay';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { Subject } from '@/types/course';
 import { generateGraph, type ProgressInfo } from '@/lib/generateGraph';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
+
+// ─── Semester helpers ───────────────────────────────
+function parseSemesterKey(key: string): number {
+  // "2025.1" → 20251, "2024.2" → 20242
+  const match = key.match(/(\d{4})[.\-/]?(\d)/);
+  if (match) return parseInt(match[1]) * 10 + parseInt(match[2]);
+  return 0; // "Sem semestre" goes first
+}
+
+function isSemesterPast(subjects: Subject[]): boolean {
+  return subjects.length > 0 && subjects.every(s => s.progress >= 100 || (s.status === 'ready' && s.nodes.length > 0 && s.nodes.every(n => n.mastery >= 1)));
+}
+
+function getSemesterLabel(key: string, index: number): string {
+  if (key === 'Sem semestre') return key;
+  return `${index + 1}º Semestre — ${key}`;
+}
+
+const QUICK_SEMESTERS = ['2024.2', '2025.1', '2025.2', '2026.1'];
 
 const statusConfig: Record<Subject['status'], { label: string; color: string; icon: typeof CheckCircle2 }> = {
   empty: { label: 'VAZIO', color: 'text-muted bg-paper border-line', icon: FileText },
@@ -41,6 +60,46 @@ export default function CoursePage() {
 
   // Abort controller for cancelling generation
   const abortRef = useRef<AbortController | null>(null);
+
+  // ─── Semester grouping ──────────────────────────────
+  const [collapsedSemesters, setCollapsedSemesters] = useState<Record<string, boolean>>({});
+
+  const semesterGroups = useMemo(() => {
+    if (!course) return [];
+    const grouped = course.subjects.reduce((acc, s) => {
+      const key = s.semester?.trim() || 'Sem semestre';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(s);
+      return acc;
+    }, {} as Record<string, Subject[]>);
+
+    const sorted = Object.entries(grouped).sort(
+      ([a], [b]) => parseSemesterKey(a) - parseSemesterKey(b)
+    );
+
+    // Find "active" semester: most recent with at least one non-100% subject
+    let activeSemester = '';
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const [key, subs] = sorted[i];
+      if (key !== 'Sem semestre' && subs.some(s => s.progress < 100)) {
+        activeSemester = key;
+        break;
+      }
+    }
+
+    return sorted.map(([key, subs], i) => ({
+      key,
+      subjects: subs,
+      label: getSemesterLabel(key, i),
+      isPast: isSemesterPast(subs) && key !== activeSemester,
+      isActive: key === activeSemester,
+      isFuture: parseSemesterKey(key) > parseSemesterKey(activeSemester) && key !== 'Sem semestre' && activeSemester !== '',
+    }));
+  }, [course]);
+
+  const toggleCollapse = (key: string) => {
+    setCollapsedSemesters(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   if (!course) {
     return (
@@ -306,9 +365,25 @@ export default function CoursePage() {
             <input
               value={subjectSemester}
               onChange={e => setSubjectSemester(e.target.value)}
-              placeholder="Ex: 2025.1"
-              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-6"
+              placeholder="Ex: 2025.1 (ano.semestre)"
+              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-2"
             />
+            <div className="flex gap-1.5 mb-6">
+              {QUICK_SEMESTERS.map(sem => (
+                <button
+                  key={sem}
+                  type="button"
+                  onClick={() => setSubjectSemester(sem)}
+                  className={`font-body text-[11px] px-2.5 py-1 rounded border transition-all duration-[120ms] ${
+                    subjectSemester === sem
+                      ? 'border-ink bg-ink text-lime'
+                      : 'border-line text-muted hover:border-ink hover:text-ink'
+                  }`}
+                >
+                  {sem}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleCreateSubject}
               disabled={!subjectName.trim()}
@@ -334,9 +409,25 @@ export default function CoursePage() {
             <input
               value={editSemester}
               onChange={e => setEditSemester(e.target.value)}
-              placeholder="Ex: 2025.1"
-              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-6"
+              placeholder="Ex: 2025.1 (ano.semestre)"
+              className="w-full bg-white border-[1.5px] border-line focus:border-ink font-body text-sm text-ink p-3 rounded-md outline-none mb-2"
             />
+            <div className="flex gap-1.5 mb-6">
+              {QUICK_SEMESTERS.map(sem => (
+                <button
+                  key={sem}
+                  type="button"
+                  onClick={() => setEditSemester(sem)}
+                  className={`font-body text-[11px] px-2.5 py-1 rounded border transition-all duration-[120ms] ${
+                    editSemester === sem
+                      ? 'border-ink bg-ink text-lime'
+                      : 'border-line text-muted hover:border-ink hover:text-ink'
+                  }`}
+                >
+                  {sem}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setEditSubject(null)}
