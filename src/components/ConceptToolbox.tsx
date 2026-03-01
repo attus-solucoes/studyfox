@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wrench, X, Play, Pause, RotateCcw } from 'lucide-react';
+import { PencilRuler, X, Play, Pause, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FormulaCalculator from '@/components/FormulaCalculator';
 import type { GraphNode } from '@/types/course';
@@ -91,7 +91,7 @@ export default function ConceptToolbox({ node }: ConceptToolboxProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <span className="font-display font-bold text-sm text-foreground">🧰 Ferramentas</span>
+              <span className="font-display font-bold text-sm text-foreground">✏️ Estojo</span>
               <button
                 onClick={() => setOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors duration-[120ms]"
@@ -120,7 +120,7 @@ export default function ConceptToolbox({ node }: ConceptToolboxProps) {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Pomodoro
+                Timer de estudo
               </button>
             </div>
 
@@ -132,9 +132,9 @@ export default function ConceptToolbox({ node }: ConceptToolboxProps) {
                 ) : (
                   <div className="text-center py-6">
                     <p className="text-2xl mb-2">📐</p>
-                    <p className="font-body text-sm text-muted-foreground">
-                      Este conceito não tem fórmula para calcular
-                    </p>
+                     <p className="font-body text-sm text-muted-foreground">
+                       Nenhuma fórmula neste conceito — use o timer para cronometrar seu estudo.
+                     </p>
                   </div>
                 )
               ) : (
@@ -148,9 +148,10 @@ export default function ConceptToolbox({ node }: ConceptToolboxProps) {
       {/* FAB */}
       <button
         onClick={() => setOpen((o) => !o)}
+        title="Abrir estojo"
         className="bg-foreground text-accent rounded-full p-3 shadow-lg hover:bg-muted-foreground transition-colors duration-[120ms]"
       >
-        <Wrench size={20} />
+        <PencilRuler size={20} />
       </button>
     </div>
   );
