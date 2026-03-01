@@ -20,18 +20,91 @@ interface ConceptChatProps {
   subject: Subject;
 }
 
+// ─── Subject type detection ─────────────────────────
+type SubjectType = 'engineering' | 'health' | 'humanities' | 'law' | 'business' | 'exact' | 'general';
+
+interface AgentPersona {
+  name: string;
+  description: string;
+  references: string[];
+  tone: string;
+}
+
+const SUBJECT_PATTERNS: [SubjectType, RegExp][] = [
+  ['engineering', /mecânica|termodinâmica|resistência|refrigeração|hidráulica|estrutural|elétrica|eletrônica|automação|processos|materiais/i],
+  ['exact', /cálculo|álgebra|geometria|física|estatística|probabilidade|equações/i],
+  ['health', /anatomia|fisiologia|farmacologia|bioquímica|patologia|clínica|medicina|enfermagem|nutrição/i],
+  ['law', /direito|legislação|jurídico|constitucional|processual|penal|civil/i],
+  ['humanities', /história|filosofia|sociologia|português|literatura|geografia/i],
+  ['business', /administração|contabilidade|marketing|finanças|gestão|empreendedorismo/i],
+];
+
+function detectSubjectType(subjectName: string): SubjectType {
+  for (const [type, pattern] of SUBJECT_PATTERNS) {
+    if (pattern.test(subjectName)) return type;
+  }
+  return 'general';
+}
+
+const PERSONAS: Record<SubjectType, AgentPersona> = {
+  engineering: {
+    name: 'Prof. engenheiro sênior',
+    description: 'especialista com foco em aplicação industrial brasileira',
+    references: ['NBR/ABNT', 'Incropera', 'Çengel & Boles', 'Shigley', 'ASHRAE Handbook'],
+    tone: 'técnico e objetivo, com exemplos industriais',
+  },
+  exact: {
+    name: 'Prof. de matemática',
+    description: 'com PhD em matemática aplicada',
+    references: ['Stewart', 'Kreyszig', 'Guidorizzi'],
+    tone: 'rigoroso e demonstrativo, passo a passo',
+  },
+  health: {
+    name: 'Prof. clínico',
+    description: 'com experiência em residência médica',
+    references: ['Guyton', 'Harrison', 'Junqueira'],
+    tone: 'clínico e preciso, com casos clínicos',
+  },
+  law: {
+    name: 'Prof. jurista',
+    description: 'com prática em escritório e docência',
+    references: ['Constituição Federal', 'códigos comentados', 'jurisprudência STF/STJ'],
+    tone: 'jurídico formal, citando dispositivos legais',
+  },
+  humanities: {
+    name: 'Prof. pesquisador',
+    description: 'com publicações na área',
+    references: ['fontes primárias da área', 'periódicos acadêmicos'],
+    tone: 'narrativo, contextualizado historicamente',
+  },
+  business: {
+    name: 'Prof. consultor',
+    description: 'com experiência em gestão de empresas brasileiras',
+    references: ['Harvard Business Review Brasil', 'IBGE', 'BCG'],
+    tone: 'prático e orientado a resultados',
+  },
+  general: {
+    name: 'Prof. universitário',
+    description: 'expert na matéria',
+    references: [],
+    tone: 'claro e didático',
+  },
+};
+
+function buildAgentPersona(subjectName: string): AgentPersona {
+  return PERSONAS[detectSubjectType(subjectName)];
+}
+
 function generateChips(node: GraphNode, subject: Subject): string[] {
   const chips: string[] = [];
   const name = subject.name.toLowerCase();
 
-  // Content-based chips (most specific first)
   if (node.formula) chips.push('Como usar esta fórmula na prática?');
   if ((node.variables?.length || 0) >= 3) chips.push('Qual variável impacta mais o resultado?');
   if ((node.commonMistakes?.length || 0) > 0) chips.push('Quero evitar os erros mais comuns');
   if ((node.keyPoints?.length || 0) >= 3) chips.push('O que cai mais na prova sobre isso?');
   if (node.level >= 3) chips.push('Quais conceitos preciso saber antes deste?');
 
-  // Subject-type chips
   if (/cálculo|física|termodinâmica|refrigeração|elétrica|mecânica|estrutural/i.test(name)) {
     chips.push('Resolve um exercício numérico passo a passo');
   } else if (/história|direito|filosofia|sociologia/i.test(name)) {
@@ -40,20 +113,24 @@ function generateChips(node: GraphNode, subject: Subject): string[] {
     chips.push('Como isso funciona no corpo humano?');
   }
 
-  // Always include generic
   chips.push('Pode dar um exemplo do mundo real?');
-
   return chips.slice(0, 4);
 }
 
 function buildSystemPrompt(node: GraphNode, subject: Subject): string {
+  const persona = buildAgentPersona(subject.name);
+
   const parts = [
-    `Você é um professor universitário especialista em "${subject.name}", com PhD na área e 15 anos de experiência docente em universidades federais brasileiras.`,
+    `Você é um ${persona.name} — ${persona.description} — especialista em "${subject.name}".`,
+    `Tom: ${persona.tone}.`,
+    persona.references.length > 0
+      ? `Quando citar conhecimento além do material, referencie: ${persona.references.join(', ')}.`
+      : '',
     ``,
     `HIERARQUIA DE FONTES:`,
     `1. PRIMÁRIO: Use o material do aluno como fonte principal`,
     `2. SECUNDÁRIO: Quando o material for insuficiente, use seu conhecimento técnico especializado — mas indique com [Além do material]`,
-    `3. REFERÊNCIAS: Quando citar conhecimento geral, mencione a fonte padrão da área (ex: "segundo Çengel & Boles, Termodinâmica" ou "conforme ASHRAE Handbook")`,
+    `3. REFERÊNCIAS: Quando citar conhecimento geral, mencione a fonte padrão da área`,
     ``,
     `CONTEXTO DO CONCEITO "${node.title}":`,
   ];
@@ -79,7 +156,7 @@ function buildSystemPrompt(node: GraphNode, subject: Subject): string {
     `- Use exemplos concretos brasileiros quando possível`,
   );
 
-  return parts.join('\n');
+  return parts.filter(Boolean).join('\n');
 }
 
 function getStorageKey(nodeId: string) {
@@ -253,6 +330,18 @@ export default function ConceptChat({ node, subject }: ConceptChatProps) {
               ))}
             </div>
           )}
+
+          {/* References footer */}
+          {messages.length > 0 && (() => {
+            const persona = buildAgentPersona(subject.name);
+            return persona.references.length > 0 ? (
+              <div className="px-4 pb-1">
+                <p className="font-body text-[10px] text-muted-foreground">
+                  Fontes: {persona.references.join(' • ')}
+                </p>
+              </div>
+            ) : null;
+          })()}
 
           {/* Input area */}
           <div className="px-4 pb-4 pt-2 border-t border-border flex-shrink-0">
