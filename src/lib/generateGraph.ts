@@ -60,6 +60,12 @@ Analise o material acadêmico e extraia a ESTRUTURA de capítulos/seções/tópi
 - Liste os tópicos principais de cada capítulo
 - Retorne APENAS JSON válido
 
+IMAGENS E FIGURAS: O material pode conter diagramas, gráficos, tabelas e esquemas.
+- Identifique e descreva TODAS as figuras presentes
+- Para cada figura: tipo (diagrama/gráfico/tabela/esquema), conceito ilustrado, valores visíveis
+- Inclua essas descrições no campo 'topics' do capítulo correspondente
+- Ex: 'Figura 3.2: Diagrama P-h do ciclo de refrigeração R-134a mostrando os 4 estados do ciclo'
+
 # OUTPUT (JSON)
 {
   "subject_name": "Nome da Matéria/Disciplina",
@@ -119,6 +125,13 @@ G9. SEM SUPERFICIALIDADE: Descrições de uma linha são PROIBIDAS. Mínimo 3 fr
       ],
       "commonMistakes": [
         "Erro real e específico que alunos cometem"
+      ],
+      "figures": [
+        {
+          "description": "Descrição da figura relevante a este conceito",
+          "type": "diagram|graph|table|equation|photo",
+          "key_values": "Valores ou dados visíveis na figura"
+        }
       ]
     }
   ],
@@ -185,6 +198,12 @@ G10. SEM SUPERFICIALIDADE: Mínimo 3 frases por description e 2 por intuition
 - Referências de livros → Desenvolva o conteúdo esperado
 - Slides com bullets → Crie narrativa pedagógica coesa
 
+IMAGENS E FIGURAS: O material pode conter diagramas, gráficos, tabelas e esquemas.
+- Identifique e descreva TODAS as figuras presentes
+- Para cada figura: tipo (diagrama/gráfico/tabela/esquema), conceito ilustrado, valores visíveis
+- Inclua essas descrições no campo 'figures' do conceito correspondente
+- Ex: 'Figura 3.2: Diagrama P-h do ciclo de refrigeração R-134a mostrando os 4 estados do ciclo'
+
 # OUTPUT (JSON)
 {
   "subject_name": "Nome da Matéria",
@@ -200,7 +219,14 @@ G10. SEM SUPERFICIALIDADE: Mínimo 3 frases por description e 2 por intuition
       "formula_latex": "F = m \\\\cdot a (ou null). Gere em notação LaTeX REAL: \\\\frac{}{}, \\\\sum, _{}, ^{}.",
       "variables": [{ "symbol": "F", "meaning": "Força resultante", "unit": "N" }],
       "keyPoints": ["O que cairia na prova"],
-      "commonMistakes": ["Erro real de alunos"]
+      "commonMistakes": ["Erro real de alunos"],
+      "figures": [
+        {
+          "description": "Descrição da figura relevante",
+          "type": "diagram|graph|table|equation|photo",
+          "key_values": "Valores ou dados visíveis na figura"
+        }
+      ]
     }
   ],
   "dependencies": [
@@ -350,7 +376,7 @@ async function multiPassPDF(
         },
       ];
 
-      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal);
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal, MODELS.chapterExtraction);
       const concepts = chapterData.concepts || [];
       const internalDeps = chapterData.internal_dependencies || [];
 
@@ -474,6 +500,11 @@ function assembleMultiPassGraph(
         : [],
       keyPoints: Array.isArray(c.keyPoints) ? c.keyPoints.filter(Boolean).map(String) : [],
       commonMistakes: Array.isArray(c.commonMistakes) ? c.commonMistakes.filter(Boolean).map(String) : [],
+      figures: Array.isArray(c.figures) ? c.figures.map((f: any) => ({
+        description: String(f.description || ''),
+        type: String(f.type || 'diagram'),
+        key_values: f.key_values ? String(f.key_values) : undefined,
+      })) : [],
       exercises: [],
       lastReviewedAt: undefined,
     };
@@ -637,7 +668,7 @@ async function multiPassText(
         },
       ];
 
-      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal);
+      const chapterData = await callOpenAI(chapterMessages, API_CONFIG.chapterOutputTokens, signal, MODELS.chapterExtraction);
       const concepts = chapterData.concepts || [];
       const internalDeps = chapterData.internal_dependencies || [];
 
@@ -688,10 +719,10 @@ async function multiPassText(
 // CHAMADA OPENAI (unificada)
 // ─────────────────────────────────────────────────────
 
-async function callOpenAI(messages: any[], maxTokens: number, signal?: AbortSignal): Promise<any> {
+async function callOpenAI(messages: any[], maxTokens: number, signal?: AbortSignal, model?: string): Promise<any> {
   const data = await callOpenAIProxy({
     messages,
-    model: MODELS.graphGeneration,
+    model: model || MODELS.graphGeneration,
     temperature: API_CONFIG.temperature,
     max_tokens: maxTokens,
     response_format: { type: 'json_object' },
@@ -769,6 +800,11 @@ function normalizeGraphData(parsed: any): GenerateGraphResult {
       : [],
     keyPoints: Array.isArray(c.keyPoints) ? c.keyPoints.filter(Boolean).map(String) : [],
     commonMistakes: Array.isArray(c.commonMistakes) ? c.commonMistakes.filter(Boolean).map(String) : [],
+    figures: Array.isArray(c.figures) ? c.figures.map((f: any) => ({
+      description: String(f.description || ''),
+      type: String(f.type || 'diagram'),
+      key_values: f.key_values ? String(f.key_values) : undefined,
+    })) : [],
     exercises: [],
     lastReviewedAt: undefined,
   }));

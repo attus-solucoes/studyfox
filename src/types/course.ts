@@ -9,6 +9,13 @@ export interface FormulaVariable {
   unit?: string;
 }
 
+// ─── Figura/Diagrama do Material ────────────────────
+export interface FigureInfo {
+  description: string;
+  type: 'diagram' | 'graph' | 'table' | 'equation' | 'photo' | string;
+  key_values?: string;
+}
+
 // ─── Exercício Gerado pela IA ───────────────────────
 export interface Exercise {
   id: string;
@@ -37,6 +44,7 @@ export interface GraphNode {
   variables?: FormulaVariable[];   // Variáveis da fórmula explicadas
   keyPoints?: string[];            // Pontos-chave (o que cai na prova)
   commonMistakes?: string[];       // Erros comuns de alunos
+  figures?: FigureInfo[];           // Figuras/diagramas do material
   exercises?: Exercise[];          // Exercícios gerados pela IA
   lastReviewedAt?: string;         // Última revisão (ISO string)
 }
